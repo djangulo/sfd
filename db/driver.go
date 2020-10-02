@@ -66,6 +66,9 @@ type AccountStorer interface {
 	// ResetPassword replaces the user's PasswordHash. Users resetting their passwords
 	// are most likely logged off, so no need to return the User object.
 	ResetPassword(userID *uuid.UUID, newPasswordHash string) error
+	// GetPasswordHash returns the password hash for the given userID. This method
+	// exists because none of the other user-returning methods include the hash.
+	GetPasswordHash(userID *uuid.UUID) (string, error)
 	LoginUser(user *models.User) (*models.User, error)
 	// RemoveProfilePic removes the user's profile picture.
 	RemoveProfilePic(userID *uuid.UUID) error

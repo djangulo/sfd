@@ -18,6 +18,7 @@ import (
 	"github.com/djangulo/sfd/db/mock"
 	_ "github.com/djangulo/sfd/db/postgres"
 	"github.com/djangulo/sfd/mail"
+	_ "github.com/djangulo/sfd/mail/console"
 	"github.com/djangulo/sfd/storage"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"

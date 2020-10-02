@@ -224,20 +224,18 @@ func Items(users []*models.User) []*models.Item {
 					}
 					image := models.ItemImage{
 						File: &models.File{
-							DBObj: &models.DBObj{
-								ID:        imgID,
-								CreatedAt: updated,
-							},
-							Path:             filepath.Join(storageDrv.Path(), path),
-							AbsPath:          absPath,
-							AltText:          fmt.Sprintf("Image %d of 4", k+1),
-							OriginalFilename: img.oFilename,
-							FileExt:          ".png",
-							Order:            k + 1,
+							ID:               uuid.NullUUID{Valid: true, UUID: imgID},
+							CreatedAt:        updated,
+							Path:             sql.NullString{Valid: true, String: filepath.Join(storageDrv.Path(), path)},
+							AbsPath:          sql.NullString{Valid: true, String: absPath},
+							AltText:          sql.NullString{Valid: true, String: fmt.Sprintf("Image %d of 4", k+1)},
+							OriginalFilename: sql.NullString{Valid: true, String: img.oFilename},
+							FileExt:          sql.NullString{Valid: true, String: ".png"},
+							Order:            sql.NullInt64{Valid: true, Int64: int64(k + 1)},
 						},
 						ItemID: &item.ID,
 					}
-					if image.Order == 1 {
+					if image.Order.Int64 == 1 {
 						item.CoverImage = &image
 					}
 					item.Images = append(item.Images, &image)

@@ -150,7 +150,7 @@ func TestCreateItem(t *testing.T, d db.Driver) {
 			name string
 			item *models.Item
 		}{
-			{name: "item", item: &models.Item{Name: "Test create item", Slug: "test-create-item", OwnerID: &users[0].ID}},
+			{name: "item", item: &models.Item{DBObj: &models.DBObj{ID: uuid.Must(uuid.NewV4())}, Name: "Test create item", Slug: "test-create-item", OwnerID: &users[0].ID}},
 		} {
 			err := d.CreateItem(test.item)
 			if err != nil {
@@ -183,14 +183,13 @@ func TestActivate(t *testing.T, d db.Driver) {
 		for _, test := range []struct {
 			name string
 			user *models.User
-			want error
 		}{
-			{"non-existing user", &models.User{Username: "non-existing", DBObj: &models.DBObj{ID: uuid.Must(uuid.NewV4())}}, models.ErrNotFound},
+			{"non-existing user", &models.User{Username: "non-existing", DBObj: &models.DBObj{ID: uuid.Must(uuid.NewV4())}}},
 		} {
 			t.Run(test.name, func(t *testing.T) {
 				err := d.ActivateUser(&test.user.ID, &users[1].ID)
-				if !errors.Is(err, test.want) {
-					t.Errorf("unexpected error: %v", err)
+				if err == nil {
+					t.Error("expected an error but didn't get one")
 				}
 			})
 		}
@@ -324,7 +323,6 @@ func TestUserByUsername(t *testing.T, d db.Driver) {
 			name, username string
 			want           error
 		}{
-			{"empty username", "", models.ErrInvalidInput},
 			{"not found", "doesn't really exist", models.ErrNotFound},
 		} {
 			t.Run(test.name, func(t *testing.T) {

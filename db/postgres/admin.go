@@ -13,7 +13,7 @@ func (pg *Postgres) ActivateUser(userID, approverID *uuid.UUID) error {
 		return fmt.Errorf("transaction error: %w", err)
 	}
 
-	stmt := `SELECT * FROM sfd.activateUser($1, $2);`
+	stmt := `SELECT * FROM sfd.adminActivateUser($1, $2);`
 	if err := tx.QueryRowx(stmt, userID, approverID).Err(); err != nil {
 		return fmt.Errorf("exec error: %w", err)
 	}

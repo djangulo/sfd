@@ -92,11 +92,22 @@ func (pg *Postgres) UserByID(id *uuid.UUID) (*models.User, error) {
 	return &obj, nil
 }
 
+// GetPasswordHash returns the password hash for the given userID. This method
+// exists because none of the other user-returning methods include the hash.
+func (pg *Postgres) GetPasswordHash(userID *uuid.UUID) (string, error) {
+	stmt := `SELECT password_hash FROM sfd.users WHERE id = $1 LIMIT 1;`
+	var hash string
+	if err := pg.db.Get(&hash, stmt, userID); err != nil {
+		return "", err
+	}
+	return hash, nil
+}
+
 // ChangePassword returns a *models.User by username or email
 func (pg *Postgres) ResetPassword(userID *uuid.UUID, newPasswordHash string) error {
 	stmt := `
 	UPDATE sfd.users
-	SET password_hash = crypt($2, gen_salt('md5'))
+	SET password_hash = $2
 	WHERE id = $1;`
 	if err := pg.db.QueryRowx(stmt, userID, newPasswordHash).Err(); err != nil {
 		return err

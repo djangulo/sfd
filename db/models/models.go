@@ -112,18 +112,23 @@ type Image interface {
 	Obj() *File
 }
 
-// File retains file properties to save in the filesystem.
+// File retains file properties to save in the filesystem. Most fields
+// are nullable because while images are nullable, views return them with
+// the object they belong to.
 type File struct {
-	*DBObj
+	ID        uuid.NullUUID `json:"id,omitempty" db:"id"`
+	CreatedAt time.Time     `json:"created_at,omitempty" db:"created_at"`
+	UpdatedAt sql.NullTime  `json:"updated_at,omitempty" db:"updated_at"`
+	DeletedAt sql.NullTime  `json:"deleted_at,omitempty" db:"deleted_at"`
 	// Path relative path to asset on fileserver.
-	Path string `json:"path,omitempty" db:"path"`
+	Path sql.NullString `json:"path,omitempty" db:"path"`
 	// AbsPath absolute path to image.
-	AbsPath string `json:"abs_path,omitempty" db:"abs_path"`
+	AbsPath sql.NullString `json:"abs_path,omitempty" db:"abs_path"`
 	// OriginalFilename the image's original filename.
-	OriginalFilename string `json:"original_filename,omitempty" db:"original_filename"`
-	FileExt          string `json:"file_ext,omitempty" db:"file_ext"`
-	AltText          string `json:"alt_text,omitempty" db:"alt_text"`
-	Order            int    `json:"order,omitempty" db:"order"`
+	OriginalFilename sql.NullString `json:"original_filename,omitempty" db:"original_filename"`
+	FileExt          sql.NullString `json:"file_ext,omitempty" db:"file_ext"`
+	AltText          sql.NullString `json:"alt_text,omitempty" db:"alt_text"`
+	Order            sql.NullInt64  `json:"order,omitempty" db:"order"`
 }
 
 type ItemImage struct {
@@ -145,16 +150,14 @@ func NewItemImage(
 	now := time.Now().In(globalConfig.TimeZone())
 	img := &ItemImage{
 		File: &File{
-			DBObj: &DBObj{
-				ID:        id,
-				CreatedAt: now,
-			},
-			Path:             path,
-			AbsPath:          abspath,
-			OriginalFilename: originalFilename,
-			FileExt:          ext,
-			AltText:          altText,
-			Order:            order,
+			ID:               uuid.NullUUID{Valid: true, UUID: id},
+			CreatedAt:        now,
+			Path:             sql.NullString{Valid: true, String: path},
+			AbsPath:          sql.NullString{Valid: true, String: abspath},
+			OriginalFilename: sql.NullString{Valid: true, String: originalFilename},
+			FileExt:          sql.NullString{Valid: true, String: ext},
+			AltText:          sql.NullString{Valid: true, String: altText},
+			Order:            sql.NullInt64{Valid: true, Int64: int64(order)},
 		},
 		ItemID: itemID,
 	}
@@ -357,16 +360,14 @@ func NewProfilePicture(
 	}
 	ppic := ProfilePicture{
 		File: &File{
-			DBObj: &DBObj{
-				ID:        id,
-				CreatedAt: time.Now(),
-			},
-			Path:             path,
-			AbsPath:          absPath,
-			OriginalFilename: originalFilename,
-			FileExt:          fileExt,
-			AltText:          altText,
-			Order:            1,
+			ID:               uuid.NullUUID{Valid: true, UUID: id},
+			CreatedAt:        time.Now(),
+			Path:             sql.NullString{Valid: true, String: path},
+			AbsPath:          sql.NullString{Valid: true, String: absPath},
+			OriginalFilename: sql.NullString{Valid: true, String: originalFilename},
+			FileExt:          sql.NullString{Valid: true, String: fileExt},
+			AltText:          sql.NullString{Valid: true, String: altText},
+			Order:            sql.NullInt64{Valid: true, Int64: 1},
 		},
 		UserID: userID,
 	}

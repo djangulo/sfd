@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -665,7 +666,7 @@ func TestItemImages(t *testing.T, s *pkg.Server) {
 		q := url.Values{}
 		images := imageList(items[0])
 		models.ImagesOrderedBy(models.SortImagesByOrderAsc).Sort(images)
-		q.Add("last-order", fmt.Sprintf("%d", images[1].Order))
+		q.Add("last-order", fmt.Sprintf("%d", images[1].Order.Int64))
 		q.Add("limit", "10")
 		u.RawQuery = q.Encode()
 
@@ -762,8 +763,8 @@ func TestAddItemImages(t *testing.T, s *pkg.Server) {
 		want := []*models.ItemImage{
 			{
 				File: &models.File{
-					AltText: "new test image added",
-					Order:   1,
+					AltText: sql.NullString{Valid: true, String: "new test image added"},
+					Order:   sql.NullInt64{Valid: true, Int64: 1},
 				},
 				ItemID: &item.ID,
 			},
@@ -819,22 +820,22 @@ func TestAddItemImages(t *testing.T, s *pkg.Server) {
 		want := []*models.ItemImage{
 			{
 				File: &models.File{
-					AltText: "new test image 1",
-					Order:   1,
+					AltText: sql.NullString{Valid: true, String: "new test image 1"},
+					Order:   sql.NullInt64{Valid: true, Int64: 1},
 				},
 				ItemID: &item.ID,
 			},
 			{
 				File: &models.File{
-					AltText: "new test image 2",
-					Order:   2,
+					AltText: sql.NullString{Valid: true, String: "new test image 2"},
+					Order:   sql.NullInt64{Valid: true, Int64: 2},
 				},
 				ItemID: &item.ID,
 			},
 			{
 				File: &models.File{
-					AltText: "new test image 3",
-					Order:   3,
+					AltText: sql.NullString{Valid: true, String: "new test image 3"},
+					Order:   sql.NullInt64{Valid: true, Int64: 3},
 				},
 				ItemID: &item.ID,
 			},

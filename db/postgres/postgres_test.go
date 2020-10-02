@@ -13,7 +13,6 @@ import (
 
 	"github.com/djangulo/sfd/db"
 	"github.com/djangulo/sfd/db/mock"
-	_ "github.com/djangulo/sfd/db/postgres"
 	pkgTest "github.com/djangulo/sfd/db/tests"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -26,7 +25,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func Test(t *testing.T) {
+func TestPostgres(t *testing.T) {
 
 	gopath := os.Getenv("GOPATH")
 	rootDir := filepath.Join(gopath, "src/github.com/djangulo/sfd")

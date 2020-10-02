@@ -22,7 +22,7 @@ CREATE OR REPLACE FUNCTION sfd.createUser(
 BEGIN
     INSERT INTO sfd.users (
         id, username, email, full_name, is_admin, active, created_at, password_hash
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, crypt($8, gen_salt('md5')));
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 
     INSERT INTO sfd.user_stats (
         user_id, login_count, items_created, bids_created, bids_won, created_at

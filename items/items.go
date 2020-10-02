@@ -122,17 +122,19 @@ func GetItem(w http.ResponseWriter, r *http.Request) {
 
 	for _, img := range images {
 		if pusher, ok := w.(http.Pusher); ok {
-			if img.Path != "" {
-				contentType := "image/" + strings.ReplaceAll(img.FileExt, ".", "")
-				options := &http.PushOptions{
-					Header: http.Header{
-						"Content-Type":    []string{contentType},
-						"Accept-Encoding": r.Header["Accept-Encoding"],
-					},
-				}
-				if err := pusher.Push(img.Path, options); err != nil {
-					render.Render(w, r, ErrInternalServerError(err))
-					return
+			if img.Path.Valid {
+				if img.Path.String != "" {
+					contentType := "image/" + strings.ReplaceAll(img.FileExt.String, ".", "")
+					options := &http.PushOptions{
+						Header: http.Header{
+							"Content-Type":    []string{contentType},
+							"Accept-Encoding": r.Header["Accept-Encoding"],
+						},
+					}
+					if err := pusher.Push(img.Path.String, options); err != nil {
+						render.Render(w, r, ErrInternalServerError(err))
+						return
+					}
 				}
 			}
 		}
@@ -150,17 +152,19 @@ func ListItems(w http.ResponseWriter, r *http.Request) {
 
 	for _, item := range items {
 		if pusher, ok := w.(http.Pusher); ok {
-			if item.CoverImage.Path != "" {
-				contentType := "image/" + strings.ReplaceAll(item.CoverImage.FileExt, ".", "")
-				options := &http.PushOptions{
-					Header: http.Header{
-						"Content-Type":    []string{contentType},
-						"Accept-Encoding": r.Header["Accept-Encoding"],
-					},
-				}
-				if err := pusher.Push(item.CoverImage.Path, options); err != nil {
-					render.Render(w, r, ErrInternalServerError(err))
-					return
+			if item.CoverImage.Path.Valid {
+				if item.CoverImage.Path.String != "" {
+					contentType := "image/" + strings.ReplaceAll(item.CoverImage.FileExt.String, ".", "")
+					options := &http.PushOptions{
+						Header: http.Header{
+							"Content-Type":    []string{contentType},
+							"Accept-Encoding": r.Header["Accept-Encoding"],
+						},
+					}
+					if err := pusher.Push(item.CoverImage.Path.String, options); err != nil {
+						render.Render(w, r, ErrInternalServerError(err))
+						return
+					}
 				}
 			}
 		}
@@ -363,12 +367,14 @@ func (s *Server) AddItemImages(w http.ResponseWriter, r *http.Request) {
 			render.Render(w, r, ErrInternalServerError(err))
 			return
 		}
-		image.Path = db.ItemImagePath(&item.ID, &image.ID, ext, s.fs.Root())
-		image.AbsPath, err = s.fs.AddFile(file, image.Path)
+		image.Path.String = db.ItemImagePath(&item.ID, &image.ID.UUID, ext, s.fs.Root())
+		image.Path.Valid = true
+		image.AbsPath.String, err = s.fs.AddFile(file, image.Path.String)
 		if err != nil {
 			render.Render(w, r, ErrInternalServerError(err))
 			return
 		}
+		image.AbsPath.Valid = true
 
 		if err := file.Close(); err != nil {
 			render.Render(w, r, ErrInternalServerError(err))
@@ -379,8 +385,8 @@ func (s *Server) AddItemImages(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.store.AddImages(&item.ID, images...); err != nil {
 		for _, img := range images {
-			if err := s.fs.RemoveFile(img.Path); err != nil {
-				log.Printf("error removing image %s, must proceed manually\n", img.AbsPath)
+			if err := s.fs.RemoveFile(img.Path.String); err != nil {
+				log.Printf("error removing image %s, must proceed manually\n", img.AbsPath.String)
 			}
 		}
 		render.Render(w, r, ErrInternalServerError(err))
@@ -398,17 +404,19 @@ func ItemImages(w http.ResponseWriter, r *http.Request) {
 
 	for _, img := range images {
 		if pusher, ok := w.(http.Pusher); ok {
-			if img.Path != "" {
-				contentType := "image/" + strings.ReplaceAll(img.FileExt, ".", "")
-				options := &http.PushOptions{
-					Header: http.Header{
-						"Content-Type":    []string{contentType},
-						"Accept-Encoding": r.Header["Accept-Encoding"],
-					},
-				}
-				if err := pusher.Push(img.Path, options); err != nil {
-					render.Render(w, r, ErrInternalServerError(err))
-					return
+			if img.Path.Valid {
+				if img.Path.String != "" {
+					contentType := "image/" + strings.ReplaceAll(img.FileExt.String, ".", "")
+					options := &http.PushOptions{
+						Header: http.Header{
+							"Content-Type":    []string{contentType},
+							"Accept-Encoding": r.Header["Accept-Encoding"],
+						},
+					}
+					if err := pusher.Push(img.Path.String, options); err != nil {
+						render.Render(w, r, ErrInternalServerError(err))
+						return
+					}
 				}
 			}
 		}

@@ -32,6 +32,7 @@ func Test(t *testing.T, s *pkg.Server) {
 	t.Run("TestGetUser", func(t *testing.T) { TestGetUser(t, s) })
 	t.Run("TestPasswordResetInit", func(t *testing.T) { TestPasswordResetInit(t, s) })
 	t.Run("TestCheckPassResetToken", func(t *testing.T) { TestCheckPassResetToken(t, s) })
+	t.Run("TestPasswordResetConfirm", func(t *testing.T) { TestPasswordResetConfirm(t, s) })
 }
 
 func TestGetUser(t *testing.T, s *pkg.Server) {
@@ -180,4 +181,77 @@ func TestCheckPassResetToken(t *testing.T, s *pkg.Server) {
 	if !strings.Contains(string(bb), "token is invalid") {
 		t.Errorf("unexpected error in %q", string(bb))
 	}
+}
+
+func TestPasswordResetConfirm(t *testing.T, s *pkg.Server) {
+	r := chi.NewRouter()
+	r.With(s.UserContext).Get("/users/{username}", pkg.GetUser)
+	r.Post("/init", s.PasswordResetInit)
+	r.Get("/check", s.CheckPassResetToken)
+	r.Post("/confirm", s.PasswordResetConfirm)
+
+	ts := httptest.NewTLSServer(r)
+	defer ts.Close()
+	client := ts.Client()
+	// generate an email and extract the token from said email
+	// in order to use it in the test server
+	extractToken := func(t *testing.T, ts *httptest.Server, username string) string {
+		req := &pkg.PassResetInitRequest{UsernameOrEmail: username}
+		b, err := json.Marshal(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = client.Post(
+			ts.URL+"/init",
+			"application/json; charset=utf-8",
+			bytes.NewReader(b),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err = ioutil.ReadFile(filepath.Join(os.TempDir(), "sfd_password_reset.txt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		re := regexp.MustCompile(`\?token=([\w\d-]+)`)
+		match := re.FindAllStringSubmatch(string(b), -1)
+
+		res, err := client.Get(ts.URL + "/check?token=" + match[0][1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got = new(pkg.ValidationTokenResponse)
+		testutils.DecodeJSON(t, res, got)
+		return got.Token
+	}
+	t.Run("success", func(t *testing.T) {
+
+		req := &pkg.PassResetRequest{
+			Token:          extractToken(t, ts, users[0].Username),
+			Password:       "newPassword12345",
+			RepeatPassword: "newPassword12345",
+		}
+		b, err := json.Marshal(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = client.Post(
+			ts.URL+"/confirm",
+			"application/json; charset=utf-8",
+			bytes.NewReader(b),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		match, err := s.ComparePassword(&users[0].ID, req.Password)
+
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !match {
+			t.Error("passwords do not match")
+		}
+
+	})
+
 }

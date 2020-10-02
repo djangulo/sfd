@@ -238,13 +238,13 @@ VALUES
 		p := user.Picture
 		stmt += fmt.Sprintf(
 			`('%s', '%s', '%s', '%s', '%s', '%s', %d, '%s')`,
-			p.ID.String(),
-			p.Path,
-			p.AbsPath,
-			p.OriginalFilename,
-			p.AltText,
-			p.FileExt,
-			p.Order,
+			p.ID.UUID.String(),
+			p.Path.String,
+			p.AbsPath.String,
+			p.OriginalFilename.String,
+			p.AltText.String,
+			p.FileExt.String,
+			p.Order.Int64,
 			p.UserID.String(),
 		)
 		if i == len(users)-1 {
@@ -349,13 +349,13 @@ VALUES
 		for j, p := range item.Images {
 			stmt += fmt.Sprintf(
 				`('%s', '%s', '%s', '%s', '%s', '%s', %d, '%s')`,
-				p.ID.String(),
-				p.Path,
-				p.AbsPath,
-				p.OriginalFilename,
-				p.AltText,
-				p.FileExt,
-				p.Order,
+				p.ID.UUID.String(),
+				p.Path.String,
+				p.AbsPath.String,
+				p.OriginalFilename.String,
+				p.AltText.String,
+				p.FileExt.String,
+				p.Order.Int64,
 				p.ItemID,
 			)
 			if i == len(items)-1 && j == len(item.Images)-1 {

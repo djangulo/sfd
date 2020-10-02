@@ -218,8 +218,8 @@ func (is *ImageSorter) Less(i, j int) bool {
 }
 
 func SortImagesByOrderDesc(i1, i2 *ItemImage) bool {
-	return i1.Order > i2.Order
+	return i1.Order.Int64 > i2.Order.Int64
 }
 func SortImagesByOrderAsc(i1, i2 *ItemImage) bool {
-	return i1.Order < i2.Order
+	return i1.Order.Int64 < i2.Order.Int64
 }

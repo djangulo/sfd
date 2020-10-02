@@ -138,6 +138,18 @@ func NewServer(
 	return &server, nil
 }
 
+func (s *Server) ComparePassword(userID *uuid.UUID, pass string) (bool, error) {
+	hash, err := s.store.GetPasswordHash(userID)
+	if err != nil {
+		return false, err
+	}
+	match, err := password.Compare(pass, hash)
+	if err != nil {
+		return false, err
+	}
+	return match, nil
+}
+
 // NotifyAdminsNewUser sends an email to every site admin when a new user account
 // is created.
 func (s *Server) NotifyAdminsNewUser(user *models.User, userLink string) error {
@@ -668,6 +680,8 @@ type UserProfileResponse struct {
 }
 
 func (upr *UserProfileResponse) Render(w http.ResponseWriter, r *http.Request) error {
+	// prevent leaking the hash
+	upr.User.PasswordHash = ""
 	return nil
 }
 
@@ -680,16 +694,18 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 
 	if pusher, ok := w.(http.Pusher); ok {
 		img := user.Picture
-		if img.Path != "" {
-			contentType := "image/" + strings.ReplaceAll(img.FileExt, ".", "")
-			options := &http.PushOptions{
-				Header: http.Header{
-					"Content-Type":    []string{contentType},
-					"Accept-Encoding": r.Header["Accept-Encoding"],
-				},
-			}
-			if err := pusher.Push(img.Path, options); err != nil {
-				log.Println(err)
+		if img.Path.Valid {
+			if img.Path.String != "" {
+				contentType := "image/" + strings.ReplaceAll(img.FileExt.String, ".", "")
+				options := &http.PushOptions{
+					Header: http.Header{
+						"Content-Type":    []string{contentType},
+						"Accept-Encoding": r.Header["Accept-Encoding"],
+					},
+				}
+				if err := pusher.Push(img.Path.String, options); err != nil {
+					log.Println(err)
+				}
 			}
 		}
 	}
@@ -742,7 +758,7 @@ func (s *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	match, err := password.Compare(data.Password, user.PasswordHash)
+	match, err := s.ComparePassword(&user.ID, data.Password)
 	if err != nil {
 		render.Render(w, r, sfdErrors.ErrInvalidUsernameOrPassword)
 		return

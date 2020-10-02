@@ -80,6 +80,7 @@ jobs:
     plan:
       - get: sfd-git
         trigger: true
+        passed: [publish-dind-go]
       - get: dind-go-image
       - task: run-tests
         image: dind-go-image
@@ -118,6 +119,7 @@ jobs:
     plan:
       - get: sfd-git
         trigger: true
+        passed: [publish-cypress-go]
       - task: run-e2e
         config:
           <<: *e2e-config

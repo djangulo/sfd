@@ -5,11 +5,16 @@ import (
 	"path/filepath"
 
 	"github.com/gofrs/uuid"
+
+	"github.com/djangulo/sfd/config"
 )
+
+var cfg = config.Get()
 
 // ItemImagePath provide a standard path to save an ItemImage.
 func ItemImagePath(itemID, imageID *uuid.UUID, ext, storageRoot string) string {
 	return filepath.Join(
+		cfg.PublicURL(),
 		storageRoot,
 		"items",
 		itemID.String(),
@@ -21,6 +26,7 @@ func ItemImagePath(itemID, imageID *uuid.UUID, ext, storageRoot string) string {
 // ProfilePicturePath provide a standard path to save user's ProfilePictures.
 func ProfilePicturePath(userID, imageID *uuid.UUID, filename, storageRoot string) string {
 	return filepath.Join(
+		cfg.PublicURL(),
 		storageRoot,
 		"users",
 		userID.String(),

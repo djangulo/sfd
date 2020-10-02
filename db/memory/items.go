@@ -226,7 +226,7 @@ func (m *Memory) UserBids(userID *uuid.UUID, opts *models.ListOptions) (int, []*
 func (m *Memory) CoverImage(itemID *uuid.UUID) ([]*models.ItemImage, error) {
 	var images = make([]*models.ItemImage, 1, 1)
 	for _, img := range m.images {
-		if *(img.ItemID) == *itemID && img.Order == 1 {
+		if *(img.ItemID) == *itemID && img.Order.Int64 == 1 {
 			images[0] = img
 			return images, nil
 		}
@@ -274,7 +274,7 @@ func (m *Memory) ItemImages(ctx context.Context, itemID *uuid.UUID) ([]*models.I
 
 	if lastOrder > 0 {
 		for i, bid := range images {
-			if bid.Order == lastOrder {
+			if bid.Order.Int64 == int64(lastOrder) {
 				if imagesLeft := len(images[(i + 1):]); limit > imagesLeft {
 					limit = imagesLeft
 				}
@@ -300,11 +300,13 @@ func (m *Memory) AddImages(itemID *uuid.UUID, images ...*models.ItemImage) error
 
 func (m *Memory) RemoveImage(id *uuid.UUID) error {
 	for i, img := range m.images {
-		if img.ID == *id {
-			m.images[i] = m.images[len(m.images)-1]
-			m.images[len(m.images)-1] = nil
-			m.images = m.images[:len(m.images)-1]
-			return nil
+		if img.ID.Valid {
+			if img.ID.UUID == *id {
+				m.images[i] = m.images[len(m.images)-1]
+				m.images[len(m.images)-1] = nil
+				m.images = m.images[:len(m.images)-1]
+				return nil
+			}
 		}
 	}
 	return fmt.Errorf("%w: %v", models.ErrNotFound, id)

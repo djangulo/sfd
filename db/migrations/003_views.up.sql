@@ -1,7 +1,14 @@
 BEGIN;
 CREATE VIEW sfd.users_stats AS
 SELECT
-    users.*,
+    users.id,
+    users.username,
+    users.email,
+    users.full_name,
+    users.active,
+    users.profile_public,
+    users.is_admin,
+    users.last_login,
     stats.login_count AS "stats.login_count",
     stats.items_created AS "stats.items_created",
     stats.bids_created AS "stats.bids_created",
@@ -41,9 +48,7 @@ SELECT
     item_images.original_filename AS "cover_image.original_filename",
     item_images.alt_text AS "cover_image.alt_text",
     item_images.file_ext AS "cover_image.file_ext",
-    item_images.order AS "cover_image.order",
-    item_images.created_at AS "cover_image.created_at",
-    item_images.updated_at AS "cover_image.updated_at"
+    item_images.order AS "cover_image.order"
 FROM
     sfd.items AS items
     LEFT JOIN sfd.users AS users ON items.owner_id = users.id
@@ -102,8 +107,6 @@ SELECT
     "cover_image.alt_text" AS "item.cover_image.alt_text",
     "cover_image.file_ext" AS "item.cover_image.file_ext",
     "cover_image.order" AS "item.cover_image.order",
-    "cover_image.created_at" AS "item.cover_image.created_at",
-    "cover_image.updated_at" AS "item.cover_image.updated_at",
     users.id AS "user.id",
     users.username AS "user.username",
     users.email AS "user.email",

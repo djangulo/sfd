@@ -57,6 +57,17 @@ func (m *Memory) UserByUsernameOrEmail(username string) (*models.User, error) {
 	return nil, models.ErrNotFound
 }
 
+// GetPasswordHash returns the password hash for the given userID. This method
+// exists because none of the other user-returning methods include the hash.
+func (m *Memory) GetPasswordHash(userID *uuid.UUID) (string, error) {
+	for _, u := range m.users {
+		if u.ID == *userID {
+			return u.PasswordHash, nil
+		}
+	}
+	return "", models.ErrNotFound
+}
+
 func (m *Memory) UserByID(id *uuid.UUID) (*models.User, error) {
 	if id == nil {
 		return nil, fmt.Errorf("%w: id is nil ", models.ErrNilPointer)
@@ -107,12 +118,14 @@ func (m *Memory) AddProfilePic(userID *uuid.UUID, image *models.ProfilePicture) 
 
 func (m *Memory) RemoveProfilePic(id *uuid.UUID) error {
 	for i, img := range m.profilePictures {
-		if img.ID != uuid.Nil {
-			if img.ID == *id {
-				m.profilePictures[i] = m.profilePictures[len(m.profilePictures)-1]
-				m.profilePictures[len(m.profilePictures)-1] = nil
-				m.profilePictures = m.profilePictures[:len(m.profilePictures)-1]
-				return nil
+		if img.ID.Valid {
+			if img.ID.UUID != uuid.Nil {
+				if img.ID.UUID == *id {
+					m.profilePictures[i] = m.profilePictures[len(m.profilePictures)-1]
+					m.profilePictures[len(m.profilePictures)-1] = nil
+					m.profilePictures = m.profilePictures[:len(m.profilePictures)-1]
+					return nil
+				}
 			}
 		}
 	}
