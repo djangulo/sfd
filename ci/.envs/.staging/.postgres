@@ -1,0 +1,4 @@
+POSTGRES_HOST=sfdapp_staging_db
+POSTGRES_DB=sfd_db
+POSTGRES_PORT=5432
+PGDATA=/database

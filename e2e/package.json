@@ -1,0 +1,21 @@
+{
+  "name": "e2e",
+  "version": "0.1.0",
+  "license": "GNU GPLv3",
+  "scripts": {
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
+    "cypress:verify": "cypress verify",
+    "cypress:testpg": "start-server-and-test start-pg cypress:run",
+    "cypress:testmem": "start-server-and-test start-mem :9000 'cypress run'",
+    "start-pg": "cd ../ && go build -o /tmp/sfdapp -tags=postgres ./cmd/app && /tmp/sfdapp -p 9000",
+    "start-mem": "cd ../ && go build -o /tmp/sfdapp -tags=memory ./cmd/app && /tmp/sfdapp -p 9000",
+    "test-ff": "start-server-and-test start-mem :9000 'cypress run --browser firefox'",
+    "test-chromium": "start-server-and-test start-mem :9000 'cypress run --browser chromium'",
+    "test-chrome": "start-server-and-test start-mem :9000 'cypress run --browser google-chrome'"
+  },
+  "devDependencies": {
+    "cypress": "^4.12.1",
+    "start-server-and-test": "^1.10.10"
+  }
+}

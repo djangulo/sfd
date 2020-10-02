@@ -1,0 +1,34 @@
+
+Estimado(a) administrador(a),
+
+Un nuevo usuario ha sido registrado y requiere su aprobación para continuar.
+
+Nombre               {{.User.FullName}}
+Correo Electrónico   {{.User.Email}}
+Nombre de usuario    {{.User.Username}}
+Fecha de registro    {{.User.CreatedAt.Format "Jan 2 2006 15:04:05"}}
+
+Favor visite el siguiente enlace para aprobar dicho usuario(a) y dar acceso a la plataforma:
+
+{{.AdminLink}}
+
+Cordialmente
+Administración - Sociedad Filatélica Dominicana
+
+-----
+
+Dear administrator,
+
+A new user has been registered and requires your approval to continue.
+
+Name                 {{.User.FullName}}
+Email                {{.User.Email}}
+Username             {{.User.Username}}
+Registration date    {{.User.CreatedAt.Format "Jan 2 2006 15:04:05"}}
+
+Please visit the following link to approve said user for the system:
+
+{{.AdminLink}}
+
+Cordially,
+Administration - Sociedad Filatélica Dominicana

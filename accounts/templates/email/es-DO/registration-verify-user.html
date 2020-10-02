@@ -1,0 +1,51 @@
+<table style="min-width: 348px; width: 100%; height: 100%;" cellspacing="0" cellpadding="0">
+  <tbody>
+    <tr style="height: 32px;"></tr>
+    <tr align="center">
+      <td>
+
+        <table style="padding-bottom: 20px; max-width: 600px; min-width: 220px; -webkit-box-shadow: 12px 12px 38px 5px rgba(99,99,99,0.65);-moz-box-shadow: 12px 12px 38px 5px rgba(99,99,99,0.65);box-shadow: 12px 12px 38px 5px rgba(99,99,99,0.65);" cellspacing="0" cellpadding="0" border="0">
+          <tbody>
+            <tr>
+              <td>
+
+                <table cellspacing="0" cellpadding="0">
+                  <tbody>
+                    <tr>
+                      <td>
+                        <div style="font-family: Roboto-Regular,Helvetica,Arial,sans-serif;padding-left: 20px; padding-right: 20px;border-bottom: thin solid #f0f0f0; color: rgba(0,0,0,0.87); font-size: 20px; padding-top: 40px; text-align: center; word-break: break-word;">
+                          <div>
+                            <h3>Por favor confirme que este correo le pertenece</h3>
+                            <p style="font-family: Roboto-Regular,Helvetica,Arial,sans-serif;color: rgba(0,0,0,0.87); font-size: 16px; line-height: 1.8;">{{.User.Email}}</p>
+                          </div>
+                        </div>
+                        <div style="font-family: Roboto-Regular,Helvetica,Arial,sans-serif;padding-left: 20px; padding-right: 20px;border-bottom: thin solid #f0f0f0; color: rgba(0,0,0,0.87); font-size: 18px; padding-top: 40px; text-align: center; word-break: break-word;">
+                          <div>
+                            <p>Esta dirección de correo electrónico fue ingresada para verificación.</p>
+                            <p>Por favor visite el siguiente enlace para confirmar que este correo le pertenece.</p>
+                            <div style="font-size:24px;padding-top:20px;padding-bottom:20px;font-weight:bold;text-align:center; width: 100%;">
+                              <a rel="noopener noreferrer" target="_blank" href="{{.VerificationLink}}">
+                                <button type="button" style="cursor: pointer; background-color: #91d6b0; width: 50%; height: 64px; font-size: 20px; color: #0b2d1b; font-weight: bold;border: 0; -webkit-box-shadow: 3px 3px 5px 4px rgba(212,212,212,1);-moz-box-shadow: 3px 3px 5px 4px rgba(212,212,212,1);box-shadow: 3px 3px 5px 4px rgba(212,212,212,1);">
+                                  Verificar mi correo.
+                                </button>
+                              </a>
+                            </div>
+                            <p>Si usted no se ha registrado en {{.SiteHost}}, puede ignorar este mensaje.</p>
+                            <p>Administración, Sociedad Filatélica Dominicana</p>
+                            {{/*<p style="font-size: 16px; color: #a2a2a2; text-align: left;">Si no desea recibir más correos como este en el futuro, puebe visitar el enlace siguiente y lo agregaremos a nuestra lista de no-envios: <a rel="noopener noreferrer" target="_blank" href="{{.UnsubscribeLink}}">cancelar subscripción</a></p>*/}}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+      </td>
+    </tr>
+  </tbody>
+</table>​

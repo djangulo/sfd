@@ -1,0 +1,12 @@
+{
+  "Details": "Detalles",
+  "Description": "Descripción",
+  "Starting price": "Precio inicial",
+  "Max price": "Precio máximo",
+  "Closed": "Cerrada",
+  "Blind": "Ciega",
+  "Closing date": "Fecha de cierre",
+  "Winning bid": "Ganador al momento",
+  "Bids": "Apuestas",
+  "Bids for": "Apuestas para {{name}}."
+}

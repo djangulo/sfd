@@ -1,0 +1,55 @@
+{
+  "lng": "en-US",
+  "items": {
+    "home": {
+      "path": "/items",
+      "url": "/items",
+      "title": "Items"
+    },
+    "detail": {
+      "path": "/items/:slug",
+      "url": "/items/{{slug}}",
+      "title": "{{object}}"
+    },
+    "new": {
+      "path": "/items/new",
+      "url": "/items/new",
+      "title": "New item"
+    }
+  },
+  "about": {
+    "path": "/about",
+    "url": "/about",
+    "title": "About"
+  },
+  "login": {
+    "path": "/login",
+    "url": "/login",
+    "title": "Login"
+  },
+  "logout": {
+    "path": "/logout",
+    "url": "/logout",
+    "title": "Logout"
+  },
+  "account": {
+    "path": "/account",
+    "url": "/account",
+    "title": "Account"
+  },
+  "support": {
+    "path": "/support",
+    "url": "/support",
+    "title": "Support"
+  },
+  "signup": {
+    "path": "/signup",
+    "url": "/signup",
+    "title": "Signup"
+  },
+  "tutorial": {
+    "path": "/tutorial",
+    "url": "/tutorial",
+    "title": "Tutorial"
+  }
+}

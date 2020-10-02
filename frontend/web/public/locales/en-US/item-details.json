@@ -1,0 +1,12 @@
+{
+  "Details": "Details",
+  "Description": "Description",
+  "Starting price": "Starting price",
+  "Max price": "Max price",
+  "Closed": "Closed",
+  "Blind": "Blind",
+  "Closing date": "Closing date",
+  "Winning bid": "Winning bid",
+  "Bids": "Bids",
+  "Bids for": "Bids for {{name}}."
+}

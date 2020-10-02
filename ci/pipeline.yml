@@ -1,0 +1,243 @@
+---
+resource_types:
+  - name: terraform
+    type: docker-image
+    source:
+      repository: ljfranklin/terraform-resource
+      tag: latest
+
+resources:
+  - name: sfd-git
+    type: git
+    icon: github-circle
+    source:
+      uri: https://github.com/djangulo/sfd.git
+      branch: dev
+
+  - name: traefik-host-git
+    type: git
+    icon: github-circle
+    source:
+      uri: https://github.com/djangulo/terraform-traefik-host.git
+
+  # - name: golang-1.15.x-image
+  #   type: registry-image
+  #   icon: docker
+  #   source:
+  #     repository: golang
+  #     tag: 1.15
+
+  - name: cypress-go-image
+    type: docker-image
+    icon: docker
+    source:
+      repository: ((dockerhub/username.username))/cypress-go
+      username: ((dockerhub/username.username))
+      password: ((dockerhub/password.password))
+      email: ((dockerhub/email.email))
+
+  - name: dind-go-image
+    type: docker-image
+    icon: docker
+    source:
+      repository: ((dockerhub/username.username))/dind-go
+      username: ((dockerhub/username.username))
+      password: ((dockerhub/password.password))
+      email: ((dockerhub/email.email))
+
+  - name: terraform
+    icon: terraform
+    type: terraform
+    source:
+      backend_type: s3
+      backend_config:
+        bucket: ((sfd-app/staging/tf-conf-bucket/name.name))
+        key: ((sfd-app/staging/tf-conf-bucket/key.key))
+        region: us-east-1
+        access_key: ((sfd-app/staging/tf-conf-bucket/access-key/id.id))
+        secret_key: ((sfd-app/staging/tf-conf-bucket/access-key/secret.secret))
+        endpoint: ((sfd-app/staging/tf-conf-bucket/endpoint.endpoint))
+        skip_metadata_api_check: true
+        skip_credentials_validation: true
+
+task-config: &task-config
+  platform: linux
+  inputs:
+    - name: sfd-git
+  params:
+    GO111MODULE: "on"
+
+e2e-config: &e2e-config
+  platform: linux
+  inputs:
+    - name: sfd-git
+  image_resource:
+    type: docker-image
+    source: { "repository": "((dockerhub/username.username))/cypress-go" }
+
+jobs:
+  - name: test-unit
+    plan:
+      - get: sfd-git
+        trigger: true
+      - get: dind-go-image
+      - task: run-tests
+        image: dind-go-image
+        config:
+          <<: *task-config
+          run:
+            path: sfd-git/ci/task-test.sh
+            args: ["all"]
+
+  - name: publish-cypress-go
+    plan:
+      - get: sfd-git
+      - put: cypress-go-image
+        params:
+          build: sfd-git/ci/images/cypress-go
+
+  - name: publish-dind-go
+    plan:
+      - get: sfd-git
+      - put: dind-go-image
+        params:
+          build: sfd-git/ci/images/dind-go
+
+  #  - name: test-e2e-firefox
+  #    plan:
+  #      - get: sfd-git
+  #        trigger: true
+  #      - task: run-e2e
+  #        config:
+  #          << : *e2e-config
+  #          run:
+  #            path: sfd-git/ci/task-test-e2e.sh
+  #            args: ["memory", "firefox"]
+  #
+  - name: test-e2e-chrome
+    plan:
+      - get: sfd-git
+        trigger: true
+      - task: run-e2e
+        config:
+          <<: *e2e-config
+          run:
+            path: sfd-git/ci/task-test-e2e.sh
+            args: ["memory", "chrome"]
+  - name: deploy-staging
+    plan:
+      - get: traefik-host-git
+        trigger: true
+      - put: terraform
+        params:
+          env_name: staging
+          terraform_source: traefik-host-git
+          vars:
+            do_token: ((access-tokens/digitalocean/concourse-ci.token))
+            ssh_keys:
+              [
+                "((ssh-keys/concourse-ci/pubkey-sig.signature))",
+                "((ssh-keys/personal-1/pubkey-sig.signature))",
+              ]
+            ssh_private_key: "((ssh-keys/concourse-ci/private-key.key))"
+            user: "((sfd-app/staging/ssh-user.user))"
+            letsencrypt_admin_email: "((sfd-app/staging/le-admin.email))"
+            records:
+              "@":
+                type: "A"
+                value: "droplet"
+                domain: ((sfd-app/staging/recordset/domain.domain))
+                ttl: 3600
+              "sfd-staging.":
+                type: "A"
+                value: "droplet"
+                domain: ((sfd-app/staging/recordset/domain.domain))
+                ttl: 3600
+      - get: sfd-git
+        trigger: true
+        passed: [test-unit, test-e2e-chrome]
+      - task: prepare-and-put-files
+        config:
+          image_resource:
+            type: registry-image
+            source: { repository: kroniak/ssh-client }
+          platform: linux
+          inputs:
+            - name: sfd-git
+          run:
+            path: /bin/sh
+            args:
+              - -c
+              - |
+                mkdir -p ~/.ssh
+                echo "((ssh-keys/concourse-ci/private-key.key))" > ~/.ssh/id_rsa
+                chmod -R 400 ~/.ssh
+                ssh -o StrictHostKeyChecking=no \
+                  ((sfd-app/staging/ssh-user.user))@((sfd-app/staging/host.host)) /bin/bash << EOF
+                  touch /home/((sfd-app/staging/ssh-user.user))/traefik/htpasswd.d/sfd-staging.users
+                  chmod 664 /home/((sfd-app/staging/ssh-user.user))/traefik/htpasswd.d/sfd-staging.users
+                  htpasswd -nb \
+                    ((sfd-app/staging/basic-auth/user1/username.username)) \
+                    ((sfd-app/staging/basic-auth/user1/password.password)) >> /home/((sfd-app/staging/ssh-user.user))/traefik/htpasswd.d/sfd-staging.users
+                  htpasswd -nb \
+                    ((sfd-app/staging/basic-auth/user2/username.username)) \
+                    ((sfd-app/staging/basic-auth/user2/password.password)) >> /home/((sfd-app/staging/ssh-user.user))/traefik/htpasswd.d/sfd-staging.users
+                  cd /home/((sfd-app/staging/ssh-user.user))/traefik
+                  ./compose.sh down
+                  rm -rf /home/((sfd-app/staging/ssh-user.user))/traefik/services/sfd-app
+                EOF
+                apk add --no-cache rsync
+                rsync -vr --exclude={'.git/','e2e'} \
+                  sfd-git/ \
+                  ((sfd-app/staging/ssh-user.user))@((sfd-app/staging/host.host)):/home/((sfd-app/staging/ssh-user.user))/traefik/services/sfd-app
+      - task: service-up
+        config:
+          image_resource:
+            type: registry-image
+            source: { repository: kroniak/ssh-client }
+          inputs:
+            - name: sfd-git
+          platform: linux
+          run:
+            path: /bin/sh
+            args:
+              - -c
+              - |
+                mkdir -p ~/.ssh
+                echo -e "((ssh-keys/concourse-ci/private-key.key))" > ~/.ssh/id_rsa
+                chmod -R 400 ~/.ssh
+                ssh -o StrictHostKeyChecking=no \
+                  ((sfd-app/staging/ssh-user.user))@((sfd-app/staging/host.host)) \
+                  '/usr/bin/env \
+                    WORKDIR=/home/((sfd-app/staging/ssh-user.user))/traefik \
+                    APPHOST=sfd-staging.((sfd-app/staging/host.host)) \
+                    SFD_SITE_HOST=((sfd-app/staging/host.host)) \
+                    SFD_PUBLIC_URL=https://sfd-staging.((sfd-app/staging/host.host)) \
+                    SFD_SECRET_KEY=((sfd-app/staging/secret-key.secret)) \
+                    SFD_SITE_ADMINS=((sfd-app/staging/site-admins.admins)) \
+                    SFD_TOKEN_SALT=((sfd-app/staging/token-salt.salt)) \
+                    SFD_EMAIL_URL="gomail://((smtp-servers/dev/smtp1/username.username)):((smtp-servers/dev/smtp1/password.password))@((smtp-servers/dev/smtp1/server.server)):((smtp-servers/dev/smtp1/port.port))" \
+                    POSTGRES_PASSWORD=((sfd-app/staging/postgres/password.password)) \
+                    POSTGRES_USER=((sfd-app/staging/postgres/user.user)) \
+                    POSTGRES_HOST=sfdapp_staging_db \
+                    POSTGRES_DB=sfd_db \
+                    POSTGRES_PORT=5432 \
+                    PGDATA=/database \
+                    bash -s' < sfd-git/ci/task-deploy-staging.sh
+  - name: test-e2e-staging-chrome
+    plan:
+      - get: sfd-git
+        trigger: true
+        passed: [deploy-staging]
+      - task: run-e2e
+        config:
+          <<: *e2e-config
+          run:
+            path: sfd-git/ci/task-test-e2e-staging.sh
+            args:
+              [
+                "https://sfd-staging.((sfd-app/staging/host.host))",
+                "((sfd-app/staging/basic-auth/user2/username.username))",
+                "((sfd-app/staging/basic-auth/user2/password.password))",
+                "chrome",
+              ]

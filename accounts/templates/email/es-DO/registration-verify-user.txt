@@ -1,0 +1,9 @@
+Por favor confirme que este correo le pertenece:  {{.User.Email}}
+
+Esta dirección de correo electrónico fue ingresada para verificación.
+Por favor visite el siguiente enlace para confirmar que este correo le pertenece.
+
+{{.VerificationLink}}
+
+Si usted no se ha registrado en {{.SiteHost}}, puede ignorar este mensaje.
+Administración, Sociedad Filatélica Dominicana

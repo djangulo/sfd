@@ -1,0 +1,14 @@
+{
+  "language": {
+    "change": "Cambiar lenguaje",
+    "language": "Lenguaje"
+  },
+  "Spanish": {
+    "unchanged": "Español",
+    "trans": "Español"
+  },
+  "English": {
+    "unchanged": "English",
+    "trans": "Inglés"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "lng": "es-DO",
+  "items": {
+    "home": {
+      "path": "/articulos",
+      "url": "/articulos",
+      "title": "Artículos"
+    },
+    "detail": {
+      "path": "/articulos/:slug",
+      "url": "/articulos/{{slug}}",
+      "title": "{{object}}"
+    },
+    "new": {
+      "path": "/articulos/nuevo",
+      "url": "/articulos/nuevo",
+      "title": "Nuevo artículo"
+    }
+  },
+  "about": {
+    "path": "/sobre-nosotros",
+    "url": "/sobre-nosotros",
+    "title": "Sobre nosotros"
+  },
+  "login": {
+    "path": "/iniciar-sesion",
+    "url": "/iniciar-sesion",
+    "title": "Iniciar sesion"
+  },
+  "logout": {
+    "path": "/cerrar-sesion",
+    "url": "/cerrar-sesion",
+    "title": "Cerrar sesión"
+  },
+  "account": {
+    "path": "/cuenta",
+    "url": "/cuenta",
+    "title": "Cuenta"
+  },
+  "support": {
+    "path": "/soporte",
+    "url": "/soporte",
+    "title": "Soporte"
+  },
+  "signup": {
+    "path": "/registrarse",
+    "url": "/registrarse",
+    "title": "Registrarse"
+  },
+  "tutorial": {
+    "path": "/tutorial",
+    "url": "/tutorial",
+    "title": "Tutorial"
+  }
+}

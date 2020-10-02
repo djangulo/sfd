@@ -1,0 +1,64 @@
+version: "3"
+
+services:
+  sfd-staging:
+    build:
+      context: $SERVICESDIR
+      dockerfile: $SERVICESDIR/sfd-app/ci/deploy/staging/app/Dockerfile
+    command: [
+      "/sfd",
+      "-p",
+      "8080",
+      "-tls-cert=./${APPHOST}.crt",
+      "-tls-key=./${APPHOST}.key"
+      ]
+    env_file:
+      - ./ci/.envs/.staging/.app
+    environment:
+      APPHOST: $APPHOST
+      SFD_SITE_HOST: $SFD_SITE_HOST
+      SFD_PUBLIC_URL: $SFD_PUBLIC_URL
+      SFD_SECRET_KEY: $SFD_SECRET_KEY
+      SFD_SITE_ADMINS: $SFD_SITE_ADMINS
+      SFD_TOKEN_SALT: $SFD_TOKEN_SALT
+      SFD_EMAIL_URL: $SFD_EMAIL_URL
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+      POSTGRES_USER: $POSTGRES_USER
+      POSTGRES_HOST: sfdapp_staging_db
+      POSTGRES_DB: sfd_db
+      POSTGRES_PORT: 5432
+      PGDATA: /database
+      SFD_DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
+    ports:
+      - "8080:8080"
+    volumes:
+      - "$SERVICESDIR/sfd-app/htpasswd.d:/htpasswd.d"
+      - "$SERVICESDIR/sfd-app/assets:/site-assets"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.port=443"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.permanent=true"
+      - "traefik.http.middlewares.staging-auth.basicauth.usersfile=/htpasswd.d/sfd-staging.users"
+      - "traefik.http.routers.sfd-staging.middlewares=https-redirect"
+      - "traefik.http.routers.sfd-staging.rule=Host(`$APPHOST`)"
+      - "traefik.http.routers.sfd-staging.entrypoints=web"
+      - "traefik.http.routers.sfd-staging-tls.rule=Host(`$APPHOST`)"
+      - "traefik.http.routers.sfd-staging-tls.entrypoints=websecure"
+      - "traefik.http.routers.sfd-staging-tls.tls=true"
+      - "traefik.http.routers.sfd-staging-tls.tls.certresolver=leresolver"
+      - "traefik.http.routers.sfd-staging-tls.middlewares=staging-auth"
+
+ sfdapp_staging_db:
+   image: postgres
+   environment:
+    POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+    POSTGRES_USER: $POSTGRES_USER
+    POSTGRES_HOST: sfdapp_staging_db
+    POSTGRES_DB: sfd_db
+    POSTGRES_PORT: 5432
+    PGDATA: /database
+
+   volumes:
+     - ./postgres-data:/database
+#

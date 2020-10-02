@@ -1,0 +1,23 @@
+BEGIN;
+DROP TABLE IF EXISTS sfd.reg_tokens;
+DROP TABLE IF EXISTS sfd.sessions;
+DROP TABLE IF EXISTS sfd.nomail_list;
+DROP INDEX IF EXISTS index_item_bids_on_created_at_id;
+DROP TABLE IF EXISTS sfd.item_bids;
+DROP TABLE IF EXISTS sfd.item_images;
+DROP INDEX IF EXISTS index_items_on_created_at_id;
+DROP TABLE IF EXISTS sfd.items;
+DROP TABLE IF EXISTS sfd.profile_pictures;
+DROP TABLE IF EXISTS sfd.files;
+DROP TABLE IF EXISTS sfd.user_addresses;
+DROP TABLE IF EXISTS sfd.user_phones;
+DROP TABLE IF EXISTS sfd.user_preferences;
+DROP TABLE IF EXISTS sfd.admin_user_approvals;
+DROP TABLE IF EXISTS sfd.admin_item_approvals;
+DROP TABLE IF EXISTS sfd.user_stats;
+DROP TABLE IF EXISTS sfd.users_item_watch;
+DROP INDEX IF EXISTS index_users_on_created_at_id;
+DROP TABLE IF EXISTS sfd.users;
+DROP TABLE IF EXISTS sfd.stampz;
+COMMIT;
+
