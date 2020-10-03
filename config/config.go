@@ -178,9 +178,16 @@ var (
 func Get() Configurer {
 	cnf = NewConfig()
 	cnf.Defaults()
-	gopath := os.Getenv("GOPATH")
-	path := filepath.Join(gopath, "src", "github.com", "djangulo", "sfd", "config", "config.conf")
-	if err := cnf.FromFile(path); err != nil {
+	cnfFile := os.Getenv("SFD_CONFIG_FILE")
+	var err error
+	if cnfFile != "" {
+		err = cnf.FromFile(cnfFile)
+	} else {
+		gopath := os.Getenv("GOPATH")
+		path := filepath.Join(gopath, "src", "github.com", "djangulo", "sfd", "config", "config.conf")
+		err = cnf.FromFile(path)
+	}
+	if err != nil {
 		panic(err)
 	}
 	cnf.FromEnv()
