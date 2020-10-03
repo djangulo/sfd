@@ -104,18 +104,18 @@ jobs:
         params:
           build: sfd-git/ci/images/dind-go
 
-   - name: test-e2e-firefox
-     plan:
-       - get: sfd-git
-         trigger: true
-         passed: [publish-cypress-go]
-       - task: run-e2e
-         config:
-           << : *e2e-config
-           run:
-             path: sfd-git/ci/task-test-e2e.sh
-             args: ["memory", "firefox"]
-  
+  - name: test-e2e-firefox
+    plan:
+      - get: sfd-git
+        trigger: true
+        passed: [publish-cypress-go]
+      - task: run-e2e
+        config:
+          <<: *e2e-config
+          run:
+            path: sfd-git/ci/task-test-e2e.sh
+            args: ["memory", "firefox"]
+
   - name: test-e2e-chrome
     plan:
       - get: sfd-git
