@@ -1,4 +1,4 @@
-FROM cypress/browsers:node13.6.0-chrome80-ff72
+FROM cypress/browsers:node13.8.0-chrome81-ff75
 
 # gcc for cgo
 RUN apt-get update && apt-get install -y --no-install-recommends \
