@@ -11,6 +11,7 @@ import (
 
 	"github.com/djangulo/sfd/db"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 // Postgres sturct to hold db.
@@ -41,7 +42,6 @@ func (pg *Postgres) Close() error {
 
 // BuildValueStrings returns postgres-escaped VALUES strings for fields of length
 // insertions, to be used in bulk-inserts.
-//
 // e.g.
 // calling buildValueStrings(length=2, fields=3) to insert 3 fields of
 // an array of length 2, returns

@@ -21,7 +21,9 @@ import (
 	"github.com/djangulo/sfd/crypto/session"
 	"github.com/djangulo/sfd/crypto/token"
 	"github.com/djangulo/sfd/db"
-	_ "github.com/djangulo/sfd/db/memory"
+	"github.com/djangulo/sfd/db/filters"
+
+	// _ "github.com/djangulo/sfd/db/memory"
 	_ "github.com/djangulo/sfd/db/postgres"
 	"github.com/djangulo/sfd/items"
 	"github.com/djangulo/sfd/mail"
@@ -122,7 +124,7 @@ func main() {
 	))
 	r.Use(cors.Handler(cors.Options{
 		// AllowedOrigins: []string{"https://foo.com"}, // Use this to allow specific origin hosts
-		AllowedOrigins: []string{"*"},
+		AllowedOrigins: []string{"*", "http://localhost:3000"},
 		// AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
@@ -137,13 +139,13 @@ func main() {
 	// }
 	r.Get("/", IndexHandler)
 	ServeSPA(r, "/*", AssetFile())
-	FileServer(r, storageDriver.Path(), http.Dir(storageDriver.Root()))
+	FileServer(r, storageDriver.Path(), storageDriver.Dir())
 	itemServer, err := items.NewServer(dbDriver, storageDriver)
 	if err != nil {
 		panic(err)
 	}
 	accountsServer, err := accounts.NewServer(
-		dbDriver, mailDriver, cfg, storageDriver, tokenManager)
+		dbDriver, mailDriver, cfg, storageDriver, tokenManager, sessionManager)
 	if err != nil {
 		panic(err)
 	}
@@ -152,7 +154,11 @@ func main() {
 	// manageable
 	r.Get(cfg.PasswordResetEndpoint(), accountsServer.CheckPassResetToken)
 	r.Get(cfg.EmailVerificationEndpoint(), accountsServer.VerifyEmailToken)
-	r.With(sessionManager.NoErrContext).Get(cfg.LoginEndpoint(), accountsServer.LoginUser)
+	r.With(sessionManager.NoErrContext).Post(cfg.LoginEndpoint(), accountsServer.LoginUser)
+	r.With(sessionManager.NoErrContext).Route(cfg.LogoutEndpoint(), func(r chi.Router) {
+		r.Get("/", accountsServer.Logout)
+		r.Post("/", accountsServer.Logout)
+	})
 	r.Route("/api/v0.1.0", func(r chi.Router) {
 		r.Route("/accounts", func(r chi.Router) {
 			r.With(
@@ -170,11 +176,16 @@ func main() {
 			})
 			r.Route("/password", func(r chi.Router) {
 				r.Post("/init", accountsServer.PasswordResetInit)
-				r.Post("/confirm", accountsServer.PasswordResetConfirm)
+				r.With(tokenManager.CSRFContext).Post("/confirm", accountsServer.PasswordResetConfirm)
 			})
+			r.Get("/state", accountsServer.RestoreUserState)
 		})
 		r.Route("/items", func(r chi.Router) {
-			r.With(sessionManager.NoErrContext, pagination.Context, itemServer.ItemListCtx).Get("/", items.ListItems)
+			r.With(
+				sessionManager.NoErrContext,
+				pagination.Context,
+				filters.Context,
+				itemServer.ItemListCtx).Get("/", items.ListItems)
 			r.With(sessionManager.Context).Post("/", itemServer.CreateItem)
 			r.Route("/{itemID}", func(r chi.Router) {
 				r.Use(itemServer.ItemCtx)

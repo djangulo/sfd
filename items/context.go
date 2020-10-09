@@ -56,7 +56,14 @@ func (s *Server) ItemCtx(next http.Handler) http.Handler {
 func (s *Server) ItemListCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		items, err := s.store.ListItems(r.Context())
+		var items []*models.Item
+		var err error
+		q := r.URL.Query()
+		if query := q.Get("q"); query != "" {
+			items, err = s.store.SearchItems(r.Context(), query)
+		} else {
+			items, err = s.store.ListItems(r.Context())
+		}
 		if err != nil {
 			render.Render(w, r, ErrNotFound)
 			return

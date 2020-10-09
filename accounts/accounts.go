@@ -1,10 +1,9 @@
 //Package accounts handles the creation and management of User
-// accounts.
+// accounts, and provides authentication handlers for User sessions.
 package accounts
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"html/template"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"github.com/djangulo/sfd/config"
-	"github.com/djangulo/sfd/crypto"
 	"github.com/djangulo/sfd/crypto/password"
 	"github.com/djangulo/sfd/crypto/session"
 	"github.com/djangulo/sfd/crypto/token"
@@ -125,14 +123,16 @@ func NewServer(
 	mailer mail.Mailer,
 	config config.Configurer,
 	storage storage.Driver,
-	tm token.Manager) (*Server, error) {
+	tm token.Manager,
+	sm session.Manager) (*Server, error) {
 
 	server := Server{
-		store:        storer,
-		mail:         mailer,
-		config:       config,
-		tokenManager: tm,
-		storage:      storage,
+		store:          storer,
+		mail:           mailer,
+		config:         config,
+		tokenManager:   tm,
+		sessionManager: sm,
+		storage:        storage,
 	}
 
 	return &server, nil
@@ -393,34 +393,20 @@ func (s *Server) CheckPassResetToken(w http.ResponseWriter, r *http.Request) {
 		// return
 	}
 
-	// clone original token with params, into a new token with a short expiry
-	expiry := time.Now().In(s.config.TimeZone()).Add(15 * time.Minute)
-	rt, err := s.tokenManager.NewToken(
-		t.LastLogin,
-		t.UserID,
-		crypto.RandomString(64), // password hash is irrelevant
-		token.Redirect,
-		&expiry)
+	csrfCookie, err := s.tokenManager.NewCSRFCookie(t.UserID, "")
 	if err != nil {
-		if err := render.Render(w, r, sfdErrors.ErrInternalServerError(err)); err != nil {
-			sfdErrors.ErrRender(err)
-			return
-		}
+		render.Render(w, r, sfdErrors.ErrInternalServerError(err))
 		return
 	}
+	http.SetCookie(w, csrfCookie)
 
-	res := &ValidationTokenResponse{
-		Token:  rt.Digest,
-		Expiry: rt.Expires,
-	}
-	if err := render.Render(w, r, res); err != nil {
-		sfdErrors.ErrRender(err)
+	if err := render.Render(w, r, NewCallBackResponse("OK", "token is valid")); err != nil {
+		render.Render(w, r, sfdErrors.ErrRender(err))
 		return
 	}
 }
 
 type PassResetRequest struct {
-	Token          string `json:"token"`
 	Password       string `json:"password"`
 	RepeatPassword string `json:"repeat_password"`
 }
@@ -432,8 +418,8 @@ func (psr *PassResetRequest) Bind(r *http.Request) error {
 	if psr.Password != psr.RepeatPassword {
 		e.Add("password", ErrPasswordsDoNotMatch)
 	}
-	if err := validators.NotEmpty(psr.Token); err != nil {
-		e.Add("token", err)
+	if err := validators.Password(psr.Password); err != nil {
+		e.Add("password", err...)
 	}
 	if e.Len() > 0 {
 		return e
@@ -452,7 +438,7 @@ func (s *Server) PasswordResetConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	t, err := s.tokenManager.CheckToken(data.Token, token.Redirect)
+	t, err := s.tokenManager.CSRFFromCookie(r)
 	if err != nil {
 		render.Render(w, r, sfdErrors.ErrInvalidToken(err))
 		return
@@ -475,6 +461,13 @@ func (s *Server) PasswordResetConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// unset csrf cookie
+	cookie, _ := r.Cookie(s.config.CSRFCookieName())
+	cookie.MaxAge = -1
+	http.SetCookie(w, cookie)
+	if err := s.tokenManager.DropToken(t.Digest); err != nil {
+		log.Println(err)
+	}
 	res := NewCallBackResponse("OK", "password reset successfully")
 	if err := render.Render(w, r, res); err != nil {
 		sfdErrors.ErrRender(err)
@@ -497,7 +490,7 @@ func (rr *RegistrationRequest) Bind(r *http.Request) error {
 	e := validators.NewErrors()
 
 	if rr.Password != rr.RepeatPassword {
-		e.Add("password", fmt.Errorf("las contraseñas no coinciden"))
+		e.Add("password", fmt.Errorf("passwords do not match"))
 	}
 	if err := validators.Password(rr.Password); err != nil {
 		e.Add("password", err...)
@@ -736,6 +729,39 @@ func (lr *LoginRequest) Bind(r *http.Request) error {
 	return nil
 }
 
+type LoginResponse struct {
+	*models.User
+}
+
+// NewLoginResponse wraps *models.User.
+func NewLoginResponse(user *models.User) *LoginResponse {
+	return &LoginResponse{User: user}
+}
+
+// Render renders LoginResponse. Cuts down the user to minimal fields, as the rest
+// of the fields are dependent on whether the user profile is public or not.
+func (lr *LoginResponse) Render(w http.ResponseWriter, r *http.Request) error {
+	var p = &models.UserPreferences{}
+	if lr.User.Preferences != nil {
+		p = lr.Preferences
+	}
+	var pic = &models.ProfilePicture{}
+	if lr.User.Picture != nil {
+		pic = lr.Picture
+	}
+	lr.User = &models.User{
+		DBObj:       &models.DBObj{ID: lr.User.ID},
+		Username:    lr.User.Username,
+		Preferences: p,
+		IsAdmin:     lr.User.IsAdmin,
+		Active:      lr.User.Active,
+		Picture:     pic,
+	}
+	return nil
+}
+
+const stateCookieName = "sfd-user-state-restore"
+
 func (s *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 	data := &LoginRequest{}
 	if err := render.Bind(r, data); err != nil {
@@ -769,7 +795,7 @@ func (s *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user.UpdatedAt = sql.NullTime{Valid: true, Time: time.Now()}
+	user.UpdatedAt = models.NewNullTime(time.Now())
 	user.LastLogin = user.UpdatedAt
 
 	user, err = s.store.LoginUser(user)
@@ -781,20 +807,113 @@ func (s *Server) LoginUser(w http.ResponseWriter, r *http.Request) {
 	values := make(session.Values)
 	values.Set(session.UserKey, user)
 
-	session, err := s.sessionManager.New(values)
+	ses, err = s.sessionManager.New(values)
 	if err != nil {
 		render.Render(w, r, sfdErrors.ErrInternalServerError(err))
 		return
 	}
 
-	cookie, err := s.sessionManager.NewAuthCookie(session, "")
+	cookie, err := s.sessionManager.NewAuthCookie(ses, "")
 	if err != nil {
 		render.Render(w, r, sfdErrors.ErrInternalServerError(err))
 		return
 	}
 	http.SetCookie(w, cookie)
 
-	res := NewCallBackResponse("OK", "successfully logged in")
+	t, err := s.tokenManager.NewToken(
+		user.LastLogin.Time,
+		&user.ID,
+		user.PasswordHash,
+		token.State,
+		&cookie.Expires,
+	)
+	if err != nil {
+		log.Println(err)
+	}
+
+	// set a cookie to restore user state
+	cookie = &http.Cookie{
+		Name:     stateCookieName,
+		Value:    t.Digest,
+		Expires:  t.Expires,
+		MaxAge:   int(t.Expires.Sub(time.Now()).Seconds()),
+		HttpOnly: false,
+		Secure:   false,
+	}
+	http.SetCookie(w, cookie)
+
+	res := NewLoginResponse(user)
+	if err := render.Render(w, r, res); err != nil {
+		render.Render(w, r, sfdErrors.ErrRender(err))
+		return
+	}
+}
+
+func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
+
+	cookie, err := r.Cookie(s.sessionManager.CookieName())
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	cookie.MaxAge = -1
+	if err := s.sessionManager.Delete(cookie.Value); err != nil {
+		render.Render(w, r, sfdErrors.ErrInternalServerError(err))
+		return
+	}
+	http.SetCookie(w, cookie)
+
+	cookie, err = r.Cookie(stateCookieName)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	cookie.MaxAge = -1
+	http.SetCookie(w, cookie)
+
+	res := NewCallBackResponse("OK", "succesfully logged out")
+	if err := render.Render(w, r, res); err != nil {
+		render.Render(w, r, sfdErrors.ErrRender(err))
+		return
+	}
+}
+
+type IsLoggedInRequest struct {
+	UserID string `json:"user_id"`
+}
+
+// Bind implements the render.Binder interface.
+func (ilir *IsLoggedInRequest) Bind(r *http.Request) error {
+	e := validators.NewErrors()
+	if err := validators.NotEmpty(ilir.UserID); err != nil {
+		e.Add("user_id", err)
+	}
+	if e.Len() > 0 {
+		return e
+	}
+	return nil
+}
+
+// RestoreUserState a client with the right cookie can restore a user object.
+func (s *Server) RestoreUserState(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie(stateCookieName)
+	if err != nil {
+		render.Render(w, r, sfdErrors.ErrInvalidRequest(fmt.Errorf("state cookie not found")))
+		return
+	}
+	t, err := s.tokenManager.CheckToken(cookie.Value, token.State)
+	if err != nil {
+		render.Render(w, r, sfdErrors.ErrInvalidRequest(fmt.Errorf("state token is invalid")))
+		return
+	}
+	user, err := s.store.UserByID(t.UserID)
+	if err != nil {
+		render.Render(w, r, sfdErrors.ErrInternalServerError(err))
+		return
+	}
+
+	res := NewLoginResponse(user)
 	if err := render.Render(w, r, res); err != nil {
 		render.Render(w, r, sfdErrors.ErrRender(err))
 		return

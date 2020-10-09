@@ -10,15 +10,16 @@ import (
 )
 
 const (
-	usersT           = "users"
-	userPhonesT      = "user_phones"
-	userAddressesT   = "user_addresses"
-	profilePicturesT = "profile_pictures"
-	userPreferencesT = "user_preferences"
-	userStats        = "user_stats"
-	itemsT           = "items"
-	itemBidsT        = "item_bids"
-	itemImagesT      = "item_images"
+	usersT            = "users"
+	userPhonesT       = "user_phones"
+	userAddressesT    = "user_addresses"
+	profilePicturesT  = "profile_pictures"
+	userPreferencesT  = "user_preferences"
+	userStats         = "user_stats"
+	itemsT            = "items"
+	itemBidsT         = "item_bids"
+	itemImagesT       = "item_images"
+	itemTranslationsT = "item_translations"
 )
 
 var (
@@ -27,15 +28,16 @@ var (
 
 func init() {
 	defaultTables = map[string]string{
-		usersT:           "sfd.users",
-		userPhonesT:      "sfd.user_phones",
-		userAddressesT:   "sfd.user_addresses",
-		profilePicturesT: "sfd.profile_pictures",
-		userPreferencesT: "sfd.user_preferences",
-		userStats:        "sfd.user_stats",
-		itemsT:           "sfd.items",
-		itemBidsT:        "sfd.item_bids",
-		itemImagesT:      "sfd.item_images",
+		usersT:            "sfd.users",
+		userPhonesT:       "sfd.user_phones",
+		userAddressesT:    "sfd.user_addresses",
+		profilePicturesT:  "sfd.profile_pictures",
+		userPreferencesT:  "sfd.user_preferences",
+		userStats:         "sfd.user_stats",
+		itemsT:            "sfd.items",
+		itemBidsT:         "sfd.item_bids",
+		itemImagesT:       "sfd.item_images",
+		itemTranslationsT: "sfd.item_translations",
 	}
 }
 
@@ -359,6 +361,30 @@ VALUES
 				p.ItemID,
 			)
 			if i == len(items)-1 && j == len(item.Images)-1 {
+				stmt += ";\n"
+			} else {
+				stmt += ",\n"
+			}
+		}
+	}
+
+	stmt += fmt.Sprintf(`
+
+-- insert test item translations
+INSERT INTO %s (lang, name, slug, description, item_id)
+VALUES
+`, defaultTables[itemTranslationsT])
+	for i, item := range items {
+		for j, t := range item.Translations {
+			stmt += fmt.Sprintf(
+				`('%s', '%s', '%s', '%s', '%s')`,
+				t.Lang.String(),
+				t.Name,
+				t.Slug,
+				t.Description,
+				t.ItemID.String(),
+			)
+			if i == len(items)-1 && j == len(item.Translations)-1 {
 				stmt += ";\n"
 			} else {
 				stmt += ",\n"

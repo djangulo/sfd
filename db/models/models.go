@@ -22,10 +22,18 @@ func init() {
 }
 
 type DBObj struct {
-	ID        uuid.UUID    `json:"id,omitempty" db:"id"`
-	CreatedAt time.Time    `json:"created_at,omitempty" db:"created_at"`
-	UpdatedAt sql.NullTime `json:"updated_at,omitempty" db:"updated_at"`
-	DeletedAt sql.NullTime `json:"deleted_at,omitempty" db:"deleted_at"`
+	ID        uuid.UUID `json:"id,omitempty" db:"id"`
+	CreatedAt time.Time `json:"created_at,omitempty" db:"created_at"`
+	UpdatedAt NullTime  `json:"updated_at,omitempty" db:"updated_at"`
+	DeletedAt NullTime  `json:"deleted_at,omitempty" db:"deleted_at"`
+}
+
+type Translation struct {
+	Lang        Language   `json:"lang" db:"lang"`
+	Name        string     `json:"name" db:"name"`
+	Slug        string     `json:"slug" db:"slug"`
+	Description string     `json:"description" db:"description"`
+	ItemID      *uuid.UUID `json:"item_id" db:"item_id"`
 }
 
 // Item struct holds an item's data. Note that amounts that refer to currency
@@ -58,15 +66,17 @@ type Item struct {
 	// Blind are the bids in this item hidden from everyone.
 	Blind bool `json:"blind" db:"blind"`
 	// PublishedAt item publication date. Nullable.
-	PublishedAt   sql.NullTime `json:"published_at" db:"published_at"`
-	UserNotified  bool         `json:"user_notified" db:"user_notified"`
-	AdminApproved bool         `json:"admin_approved" db:"admin_approved"`
-	CoverImage    *ItemImage   `json:"cover_image" db:"cover_image"`
+	PublishedAt   NullTime   `json:"published_at" db:"published_at"`
+	UserNotified  bool       `json:"user_notified" db:"user_notified"`
+	AdminApproved bool       `json:"admin_approved" db:"admin_approved"`
+	CoverImage    *ItemImage `json:"cover_image" db:"cover_image"`
 	// Images list of url to image queries /items/{id}/images/{imageID}
-	Images     []*ItemImage `json:"images"`
-	Owner      *User        `json:"-" db:"owner"`
-	Bids       []*Bid       `json:"bids"`
-	WinningBid *Bid         `json:"winning_bid" db:"winning_bid"`
+	Images       []*ItemImage   `json:"images"`
+	Owner        *User          `json:"-" db:"owner"`
+	Bids         []*Bid         `json:"bids"`
+	WinningBid   *Bid           `json:"winning_bid" db:"winning_bid"`
+	Rank         float64        `json:"rank" db:"rank"`
+	Translations []*Translation `json:"translations"`
 	// CoverImage image that will be shown in thumbnails and lists.
 	// Images     []*ItemImage `json:"images"`
 }
@@ -78,17 +88,12 @@ func NewItem(
 	blind bool,
 	bidInterval int,
 	bidDeadline, publishDate time.Time) (*Item, error) {
-	var pd = sql.NullTime{Valid: false}
-	if !publishDate.IsZero() {
-		pd.Time = publishDate
-		pd.Valid = true
-	}
 	item := &Item{
 		DBObj: &DBObj{
 			ID:        uuid.Must(uuid.NewV4()),
 			CreatedAt: time.Now().In(globalConfig.TimeZone()),
-			UpdatedAt: sql.NullTime{Valid: false},
-			DeletedAt: sql.NullTime{Valid: false},
+			UpdatedAt: NullTime{NullTime: &sql.NullTime{Valid: false}},
+			DeletedAt: NullTime{NullTime: &sql.NullTime{Valid: false}},
 		},
 		Name:          name,
 		Description:   description,
@@ -100,7 +105,7 @@ func NewItem(
 		WinningBid:    &Bid{},
 		CoverImage:    &ItemImage{File: &File{}, ItemID: &uuid.Nil},
 		BidDeadline:   bidDeadline,
-		PublishedAt:   pd,
+		PublishedAt:   NewNullTime(publishDate),
 		Blind:         blind,
 	}
 
@@ -118,17 +123,17 @@ type Image interface {
 type File struct {
 	ID        uuid.NullUUID `json:"id,omitempty" db:"id"`
 	CreatedAt time.Time     `json:"created_at,omitempty" db:"created_at"`
-	UpdatedAt sql.NullTime  `json:"updated_at,omitempty" db:"updated_at"`
-	DeletedAt sql.NullTime  `json:"deleted_at,omitempty" db:"deleted_at"`
+	UpdatedAt NullTime      `json:"updated_at,omitempty" db:"updated_at"`
+	DeletedAt NullTime      `json:"deleted_at,omitempty" db:"deleted_at"`
 	// Path relative path to asset on fileserver.
-	Path sql.NullString `json:"path,omitempty" db:"path"`
+	Path NullString `json:"path,omitempty" db:"path"`
 	// AbsPath absolute path to image.
-	AbsPath sql.NullString `json:"abs_path,omitempty" db:"abs_path"`
+	AbsPath NullString `json:"abs_path,omitempty" db:"abs_path"`
 	// OriginalFilename the image's original filename.
-	OriginalFilename sql.NullString `json:"original_filename,omitempty" db:"original_filename"`
-	FileExt          sql.NullString `json:"file_ext,omitempty" db:"file_ext"`
-	AltText          sql.NullString `json:"alt_text,omitempty" db:"alt_text"`
-	Order            sql.NullInt64  `json:"order,omitempty" db:"order"`
+	OriginalFilename NullString `json:"original_filename,omitempty" db:"original_filename"`
+	FileExt          NullString `json:"file_ext,omitempty" db:"file_ext"`
+	AltText          NullString `json:"alt_text,omitempty" db:"alt_text"`
+	Order            NullInt64  `json:"order,omitempty" db:"order"`
 }
 
 type ItemImage struct {
@@ -152,12 +157,12 @@ func NewItemImage(
 		File: &File{
 			ID:               uuid.NullUUID{Valid: true, UUID: id},
 			CreatedAt:        now,
-			Path:             sql.NullString{Valid: true, String: path},
-			AbsPath:          sql.NullString{Valid: true, String: abspath},
-			OriginalFilename: sql.NullString{Valid: true, String: originalFilename},
-			FileExt:          sql.NullString{Valid: true, String: ext},
-			AltText:          sql.NullString{Valid: true, String: altText},
-			Order:            sql.NullInt64{Valid: true, Int64: int64(order)},
+			Path:             NewNullString(path),
+			AbsPath:          NewNullString(abspath),
+			OriginalFilename: NewNullString(originalFilename),
+			FileExt:          NewNullString(ext),
+			AltText:          NewNullString(altText),
+			Order:            NewNullInt64(order),
 		},
 		ItemID: itemID,
 	}
@@ -167,12 +172,12 @@ func NewItemImage(
 
 type Bid struct {
 	*DBObj
-	Amount Currency   `json:"amount" db:"amount" form:"amount"`
-	UserID *uuid.UUID `json:"user_id" db:"user_id" form:"user_id"`
-	ItemID *uuid.UUID `json:"item_id" db:"item_id" form:"item_id"`
-	Valid  bool       `json:"valid" db:"valid" form:"valid"`
-	User   *User      `json:"-" db:"user" form:"user"`
-	Item   *Item      `json:"-" db:"item" form:"item"`
+	Amount Currency   `json:"amount,omitempty" db:"amount" form:"amount"`
+	UserID *uuid.UUID `json:"user_id,omitempty" db:"user_id" form:"user_id"`
+	ItemID *uuid.UUID `json:"item_id,omitempty" db:"item_id" form:"item_id"`
+	Valid  bool       `json:"valid,omitempty" db:"valid" form:"valid"`
+	User   *User      `json:"user,omitempty" db:"user" form:"user"`
+	Item   *Item      `json:"item,omitempty" db:"item" form:"item"`
 }
 
 func NewBid(itemID, userID *uuid.UUID, amount Currency) (*Bid, error) {
@@ -184,7 +189,7 @@ func NewBid(itemID, userID *uuid.UUID, amount Currency) (*Bid, error) {
 		DBObj: &DBObj{
 			ID:        id,
 			CreatedAt: time.Now(),
-			UpdatedAt: sql.NullTime{Valid: false},
+			UpdatedAt: NullTime{NullTime: &sql.NullTime{Valid: false}},
 		},
 		ItemID: itemID,
 		UserID: userID,
@@ -242,19 +247,19 @@ func Winner(bids []*Bid) *Bid {
 
 type User struct {
 	*DBObj
-	Username      string           `json:"username" db:"username" form:"username"`
-	Email         string           `json:"email" db:"email" form:"email"`
-	FullName      string           `json:"full_name" db:"full_name" form:"full_name"`
-	PasswordHash  string           `json:"password_hash" db:"password_hash" form:"password_hash"`
-	IsAdmin       bool             `json:"is_admin" db:"is_admin" form:"is_admin"`
-	Active        bool             `json:"active" db:"active" form:"active"`
-	LastLogin     sql.NullTime     `json:"last_login" db:"last_login"`
-	Picture       *ProfilePicture  `json:"picture" db:"picture"`
-	Stats         *UserStats       `json:"stats" db:"stats"`
-	ProfilePublic bool             `json:"profile_public" db:"profile_public"`
-	Preferences   *UserPreferences `json:"preferences" db:"preferences"`
-	Addresses     []*Address       `json:"addresses" db:"addresses"`
-	PhoneNumbers  []*PhoneNumber   `json:"phone_numbers" db:"phone_numbers"`
+	Username      string           `json:"username,omitempty" db:"username" form:"username"`
+	Email         string           `json:"email,omitempty" db:"email" form:"email"`
+	FullName      string           `json:"full_name,omitempty" db:"full_name" form:"full_name"`
+	PasswordHash  string           `json:"password_hash,omitempty" db:"password_hash" form:"password_hash"`
+	IsAdmin       bool             `json:"is_admin,omitempty" db:"is_admin" form:"is_admin"`
+	Active        bool             `json:"active,omitempty" db:"active" form:"active"`
+	LastLogin     NullTime         `json:"last_login,omitempty" db:"last_login"`
+	Picture       *ProfilePicture  `json:"picture,omitempty" db:"picture"`
+	Stats         *UserStats       `json:"stats,omitempty" db:"stats"`
+	ProfilePublic bool             `json:"profile_public,omitempty" db:"profile_public"`
+	Preferences   *UserPreferences `json:"preferences,omitempty" db:"preferences"`
+	Addresses     []*Address       `json:"addresses,omitempty" db:"addresses"`
+	PhoneNumbers  []*PhoneNumber   `json:"phone_numbers,omitempty" db:"phone_numbers"`
 }
 
 func NewUser(
@@ -268,8 +273,8 @@ func NewUser(
 		DBObj: &DBObj{
 			ID:        id,
 			CreatedAt: time.Now(),
-			UpdatedAt: sql.NullTime{Valid: false},
-			DeletedAt: sql.NullTime{Valid: false},
+			UpdatedAt: NewNullTime(time.Time{}),
+			DeletedAt: NewNullTime(time.Time{}),
 		},
 		Username:      username,
 		Email:         email,
@@ -362,12 +367,12 @@ func NewProfilePicture(
 		File: &File{
 			ID:               uuid.NullUUID{Valid: true, UUID: id},
 			CreatedAt:        time.Now(),
-			Path:             sql.NullString{Valid: true, String: path},
-			AbsPath:          sql.NullString{Valid: true, String: absPath},
-			OriginalFilename: sql.NullString{Valid: true, String: originalFilename},
-			FileExt:          sql.NullString{Valid: true, String: fileExt},
-			AltText:          sql.NullString{Valid: true, String: altText},
-			Order:            sql.NullInt64{Valid: true, Int64: 1},
+			Path:             NewNullString(path),
+			AbsPath:          NewNullString(absPath),
+			OriginalFilename: NewNullString(originalFilename),
+			FileExt:          NewNullString(fileExt),
+			AltText:          NewNullString(altText),
+			Order:            NewNullInt64(1),
 		},
 		UserID: userID,
 	}
@@ -376,11 +381,28 @@ func NewProfilePicture(
 }
 
 var (
-	reClean    = regexp.MustCompile(`[^\w\s\-]`)
+	reClean      = regexp.MustCompile(`[^\w\s\-]`)
+	diacriticsRe = map[string]*regexp.Regexp{
+		"a": regexp.MustCompile(`[áàâäåā]`),
+		"A": regexp.MustCompile(`[ÁÀÂÄÅĀ]`),
+		"e": regexp.MustCompile(`[ééêëē]`),
+		"E": regexp.MustCompile(`[ÉÉÊËĒ]`),
+		"i": regexp.MustCompile(`[íìîïī]`),
+		"I": regexp.MustCompile(`[ÍÌÎÏĪ]`),
+		"o": regexp.MustCompile(`[óòôöō]`),
+		"O": regexp.MustCompile(`[ÓÒÔÖŌ]`),
+		"u": regexp.MustCompile(`[úùûüūů]`),
+		"U": regexp.MustCompile(`[ÚÙÛÜŪŮ]`),
+		"c": regexp.MustCompile(`[ç]`),
+	}
 	reNoSpaces = regexp.MustCompile(`[-\s]+`)
 )
 
 func Slugify(str string) string {
+	// replace all diacritic vowels by their ascii counterpart
+	for k, re := range diacriticsRe {
+		str = re.ReplaceAllString(str, k)
+	}
 	str = reClean.ReplaceAllString(str, " ")
 	str = strings.ToLower(strings.TrimSpace(str))
 	return reNoSpaces.ReplaceAllString(str, "-")

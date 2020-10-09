@@ -91,13 +91,34 @@ CREATE TABLE IF NOT EXISTS sfd.items (
     closed BOOLEAN DEFAULT FALSE,
     blind boolean DEFAULT FALSE,
     user_notified boolean DEFAULT FALSE
-)
-INHERITS (
-    sfd.stampz
-);
+) INHERITS ( sfd.stampz );
 
 CREATE UNIQUE INDEX index_items_on_created_at_id ON sfd.items
     USING btree (created_at, id);
+    
+CREATE TYPE languages AS ENUM ('english', 'spanish');
+
+CREATE TABLE IF NOT EXISTS sfd.item_translations (
+    lang languages,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    item_id UUID REFERENCES sfd.items(id),
+    CONSTRAINT item_translations_pk PRIMARY KEY (lang, item_id)
+) INHERITS ( sfd.stampz );
+
+ALTER TABLE sfd.item_translations
+    ADD COLUMN 
+        textsearchable_index_col_en tsvector
+        GENERATED ALWAYS AS (
+            to_tsvector('english', coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(slug, ''))) STORED,
+    ADD COLUMN 
+        textsearchable_index_col_es tsvector
+        GENERATED ALWAYS AS (
+            to_tsvector('spanish', coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(slug, ''))) STORED;
+
+CREATE INDEX textsearch_idx_en ON sfd.item_translations USING GIN (textsearchable_index_col_en);
+CREATE INDEX textsearch_idx_es ON sfd.item_translations USING GIN (textsearchable_index_col_es);
 
 CREATE TABLE IF NOT EXISTS sfd.users_item_watch (
     user_id UUID REFERENCES sfd.users (id),

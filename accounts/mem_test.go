@@ -9,6 +9,7 @@ import (
 	pkg "github.com/djangulo/sfd/accounts"
 	pkgTest "github.com/djangulo/sfd/accounts/tests"
 	"github.com/djangulo/sfd/config"
+	"github.com/djangulo/sfd/crypto/session"
 	"github.com/djangulo/sfd/crypto/token"
 	"github.com/djangulo/sfd/db"
 	_ "github.com/djangulo/sfd/db/memory"
@@ -41,8 +42,12 @@ func Test(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+	sm, err := session.NewManager(dbDriver, "sfd-test-session", 60, cnf)
+	if err != nil {
+		panic(err)
+	}
 
-	server, err := pkg.NewServer(dbDriver, mailDriver, cnf, storageDriver, tm)
+	server, err := pkg.NewServer(dbDriver, mailDriver, cnf, storageDriver, tm, sm)
 	if err != nil {
 		panic(err)
 	}

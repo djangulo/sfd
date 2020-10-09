@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	nurl "net/url"
 	"sync"
 )
@@ -27,13 +28,14 @@ type Driver interface {
 	// Root returns the root dir of the storage driver.
 	Root() string
 	// NormalizePath returns the passed entries with the necessary prefix
-	// e.g. assets/rest/of/path
+	// e.g. driver.NormalizePath("path/to/file") == "/assets/path/to/file"
 	NormalizePath(entries ...string) string
-	// AddFile saves the contents of r to path, and returns the absolute path of the
-	// created file and any potential errors.
+	// AddFile saves the contents of r to path, and returns the absolute path on disk of the
+	// created file  and any potential errors.
 	AddFile(r io.Reader, path string) (string, error)
 
 	RemoveFile(path string) error
+	Dir() http.FileSystem
 }
 
 func Open(url string) (Driver, error) {

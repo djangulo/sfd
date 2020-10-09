@@ -2,7 +2,6 @@ package tests
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -763,8 +762,8 @@ func TestAddItemImages(t *testing.T, s *pkg.Server) {
 		want := []*models.ItemImage{
 			{
 				File: &models.File{
-					AltText: sql.NullString{Valid: true, String: "new test image added"},
-					Order:   sql.NullInt64{Valid: true, Int64: 1},
+					AltText: models.NewNullString("new test image added"),
+					Order:   models.NewNullInt64(1),
 				},
 				ItemID: &item.ID,
 			},
@@ -820,22 +819,22 @@ func TestAddItemImages(t *testing.T, s *pkg.Server) {
 		want := []*models.ItemImage{
 			{
 				File: &models.File{
-					AltText: sql.NullString{Valid: true, String: "new test image 1"},
-					Order:   sql.NullInt64{Valid: true, Int64: 1},
+					AltText: models.NewNullString("new test image 1"),
+					Order:   models.NewNullInt64(1),
 				},
 				ItemID: &item.ID,
 			},
 			{
 				File: &models.File{
-					AltText: sql.NullString{Valid: true, String: "new test image 2"},
-					Order:   sql.NullInt64{Valid: true, Int64: 2},
+					AltText: models.NewNullString("new test image 2"),
+					Order:   models.NewNullInt64(2),
 				},
 				ItemID: &item.ID,
 			},
 			{
 				File: &models.File{
-					AltText: sql.NullString{Valid: true, String: "new test image 3"},
-					Order:   sql.NullInt64{Valid: true, Int64: 3},
+					AltText: models.NewNullString("new test image 3"),
+					Order:   models.NewNullInt64(3),
 				},
 				ItemID: &item.ID,
 			},

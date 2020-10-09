@@ -11,10 +11,12 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi"
 
 	pkg "github.com/djangulo/sfd/accounts"
+	"github.com/djangulo/sfd/config"
 	"github.com/djangulo/sfd/db/mock"
 	"github.com/djangulo/sfd/db/models"
 	testutils "github.com/djangulo/sfd/testing"
@@ -130,6 +132,9 @@ func TestCheckPassResetToken(t *testing.T, s *pkg.Server) {
 	r.Post("/init", http.HandlerFunc(s.PasswordResetInit))
 	r.Get("/check", http.HandlerFunc(s.CheckPassResetToken))
 
+	cnf := config.NewConfig()
+	cnf.Defaults()
+
 	ts := httptest.NewTLSServer(r)
 	defer ts.Close()
 	client := ts.Client()
@@ -166,11 +171,19 @@ func TestCheckPassResetToken(t *testing.T, s *pkg.Server) {
 	}
 
 	testutils.AssertJSON(t, res)
-	var got = new(pkg.ValidationTokenResponse)
-	testutils.DecodeJSON(t, res, got)
-	// ensure tokens are different
-	if strings.Contains(verifyToken, got.Token) || strings.Contains(got.Token, verifyToken) {
-		t.Errorf("tokens are equal: %q %q", verifyToken, got.Token)
+	var cookie *http.Cookie
+	for _, c := range res.Cookies() {
+		if c.Name == cnf.CSRFCookieName() {
+			cookie = c
+			break
+		}
+	}
+	if cookie == nil {
+		t.Fatalf("CSRF cookie %q was not set", cnf.CSRFCookieName())
+	}
+	// ensure the original token and the cookie are different
+	if strings.Contains(verifyToken, cookie.Value) || strings.Contains(cookie.Value, verifyToken) {
+		t.Errorf("tokens are equal: %q %q", verifyToken, cookie.Value)
 	}
 	// ensure original token is no longer valid
 	res, err = client.Get(ts.URL + "/check?token=" + verifyToken)
@@ -192,12 +205,18 @@ func TestPasswordResetConfirm(t *testing.T, s *pkg.Server) {
 
 	ts := httptest.NewTLSServer(r)
 	defer ts.Close()
+
+	cnf := config.NewConfig()
+	cnf.Defaults()
 	client := ts.Client()
-	// generate an email and extract the token from said email
-	// in order to use it in the test server
-	extractToken := func(t *testing.T, ts *httptest.Server, username string) string {
-		req := &pkg.PassResetInitRequest{UsernameOrEmail: username}
-		b, err := json.Marshal(req)
+	// generate an email and extract the token from said email,
+	// use the token and return the CSRF cookie.
+	getCSRFCookie := func(
+		t *testing.T,
+		ts *httptest.Server,
+		username string) string {
+		data := &pkg.PassResetInitRequest{UsernameOrEmail: username}
+		b, err := json.Marshal(data)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -220,30 +239,50 @@ func TestPasswordResetConfirm(t *testing.T, s *pkg.Server) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var got = new(pkg.ValidationTokenResponse)
-		testutils.DecodeJSON(t, res, got)
-		return got.Token
+		cnf := config.NewConfig()
+		cnf.Defaults()
+		for _, c := range res.Cookies() {
+			if c.Name == cnf.CSRFCookieName() {
+				return c.Value
+			}
+		}
+		return ""
 	}
 	t.Run("success", func(t *testing.T) {
 
-		req := &pkg.PassResetRequest{
-			Token:          extractToken(t, ts, users[0].Username),
-			Password:       "newPassword12345",
-			RepeatPassword: "newPassword12345",
+		data := &pkg.PassResetRequest{
+			Password:       "!newPassword12345",
+			RepeatPassword: "!newPassword12345",
 		}
-		b, err := json.Marshal(req)
+		b, err := json.Marshal(data)
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = client.Post(
+		digest := getCSRFCookie(t, ts, users[0].Username)
+
+		req, err := http.NewRequest(
+			http.MethodPost,
 			ts.URL+"/confirm",
-			"application/json; charset=utf-8",
 			bytes.NewReader(b),
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		match, err := s.ComparePassword(&users[0].ID, req.Password)
+		req.AddCookie(&http.Cookie{
+			Name:     cnf.CSRFCookieName(),
+			Value:    digest,
+			Expires:  time.Now().Add(30 * time.Second),
+			Secure:   true,
+			HttpOnly: true,
+		})
+		req.Header.Add("Content-Type", "application/json")
+
+		res, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testutils.AssertJSON(t, res)
+		match, err := s.ComparePassword(&users[0].ID, data.Password)
 
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

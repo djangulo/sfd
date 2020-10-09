@@ -6,7 +6,6 @@
 package mock
 
 import (
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -21,18 +20,17 @@ import (
 	"github.com/gofrs/uuid"
 
 	"github.com/djangulo/sfd/crypto/password"
-	"github.com/djangulo/sfd/db"
 	"github.com/djangulo/sfd/db/models"
 	"github.com/djangulo/sfd/storage"
 	_ "github.com/djangulo/sfd/storage/fs"
 )
 
 var (
-	testImages = []struct{ oFilename, alt, data string }{
-		{"test-image-1.png", "Test image 1", "iVBORw0KGgoAAAANSUhEUgAAAJYAAAB8BAMAAAB58FQ1AAAAG1BMVEXMzMyWlpaqqqq3t7fFxcW+vr6xsbGjo6OcnJyLKnDGAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABCUlEQVRoge3SsU7DMBSF4RPHdjLaTcUMUxkTwcAYS1SsRjAwJqKCjq2QmK2WwmvjECI2JGc+3xZL+ZXrXICIiIiIiIiIiFJk0NZ22B7/jgxw+Qkok9q6gHh/8flZ304nwkAcbzqUqa3GoqiBohMd9FJWQG4NMp8HrFJb6wbFY5y0jS/jIHaAfDBwcUB1Sp7RIdsv4FoVW03j44kcGjqU13Nam6fO/RSKBaZW71/ljFa8ojB+l66m1t1JfsxrKTPeV/n125KHNrfW1smtBnoX/+M5sL2vx9bwcLtetsmt8q2v4355yEqEsZU9X9WYM6Pax50f9l6EYb+GhrNxydJbRERERERERET/+QbEaSM2tsdQ3wAAAABJRU5ErkJggg=="},
-		{"test-image-2.png", "Test image 2", "iVBORw0KGgoAAAANSUhEUgAAAJYAAACWBAMAAADOL2zRAAAAG1BMVEXMzMyWlpaqqqq3t7fFxcW+vr6xsbGjo6OcnJyLKnDGAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABAElEQVRoge3SMW+DMBiE4YsxJqMJtHOTITPeOsLQnaodGImEUMZEkZhRUqn92f0MaTubtfeMh/QGHANEREREREREREREtIJJ0xbH299kp8l8FaGtLdTQ19HjofxZlJ0m1+eBKZcikd9PWtXC5DoDotRO04B9YOvFIXmXLy2jEbiqE6Df7DTleA5socLqvEFVxtJyrpZFWz/pHM2CVte0lS8g2eDe6prOyqPglhzROL+Xye4tmT4WvRcQ2/m81p+/rdguOi8Hc5L/8Qk4vhZzy08DduGt9eVQyP2qoTM1zi0/uf4hvBWf5c77e69Gf798y08L7j0RERERERERERH9P99ZpSVRivB/rgAAAABJRU5ErkJggg=="},
-		{"test-image-3.png", "Test image 3", "iVBORw0KGgoAAAANSUhEUgAAASwAAAEsBAMAAACLU5NGAAAAG1BMVEXMzMyWlpacnJyqqqrFxcWxsbGjo6O3t7e+vr6He3KoAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAD90lEQVR4nO3cwW+bSBQH4AcGw5HnJDhHaN3dHO1su9ojNGnPtrUb7dFuIiVHnEo5263Uv3vfGwab1myVA5DV6vcpgeD35HmeGYbJxUQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/zOb3N5BRexlu9/Jo+NCQFl/HbWrRK7s6Amcdy3jCfaftyOT/OmsnLxSFqkzu04Ns1Z+RxPOMtUc63fH6U5HP8O5/uo1Vyh9IJhTylwSjz0pV0y4Tex0dJ7iij3ck+WiV3J9RPvVhRLgO5O5V+KOSl7MesnXSRH++jNrlDAWurEW0i6ZOz8jI9mlwaDXkftckd8nXEdgnNVjI2sf6Q+VvLSMiMHJnupHC0j9rkrmlL87Lhs7JK86oM1fowVFq0jdrkjn2QKbMuTEvD8aGsfCQ9th9PbzHeR21yt1KWkUq3et+Tq4tDHpnXfZ67+7Zdltu1itrkbrEuRWVLWdmwHbl0shlXSQ7LLVtFbXLXZUmLphHOHK3IsWVtTg6Lk6PFV1Gb3G1Z9I1Xjb015NpSHq7jfntL7reoaW7JhD+pJQ2537llVuyGO1Em17iWJMt7f3ei/zeZcdGlKLDr1saW5XPV9F9bM2pV1CZ3yDxDZFx0HZcF0z+s8rpwVcuWPo5k1KqoTe7QwD58mp6Js/PUTn4tVEatx2ei3lAzu4M4t3uErQl5PN3YOb84NR+gitrkDnl8J51QNO23hjLH7SqQxxnp0trbfotmo9t0RE27U9k9hFw2PuBfLnVD0d/u9KMs8hNq2svrxFqXJXprZtmg9riXp5v0jTRI4afyn5lv1X8+gRaQ22XA/zT6sxatkgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD65tjf/5gXLYtHb/8l8kNZkVw5zEwjIjei8ru7rtJ7/YqcO3ISorTFsiLvt+eXZY7xlp5sWd6b7KscrpeZ80DBus2y6D1dviY3C+QP/9WUnGWkp8GrhZa1fE3DQiK1ssYrurdlDeblwZ86TzTctFuWf/dxPihy+kw31+/IuTOnm2v98I6EwoTe1cuKLsLEluVm5cFLHHf7pc2JKIPoZl4STpfFHzSRfnEyc5pQrmVJiO7l13yRHpdlPQ0LW5ZTHSInWN23WZZMedMJycUq0aa1FT1F1dyK6MugoHpvuY903Fv0a9Jqb+n7apesHlY0KSvRU6233CV9V5Z/RsdzixbzlsvSuUXL4nFOT9mVtq2nw9yiYPx9WebCHGt3IrW7yOnby51IuyzPKEgv9M31dLgTKUgayioH+oqrdavlsp5hWPTb3jM9vnQBjZyLl64AAP43/gHVSaMe2vmdiAAAAABJRU5ErkJggg=="},
-		{"test-image-4.png", "Test image 4", "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"},
+	testImages = []struct{ ext, oFilename, alt, data string }{
+		{".png", "test-image-1.png", "Test image 1", "iVBORw0KGgoAAAANSUhEUgAAAJYAAAB8BAMAAAB58FQ1AAAAG1BMVEXMzMyWlpaqqqq3t7fFxcW+vr6xsbGjo6OcnJyLKnDGAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABCUlEQVRoge3SsU7DMBSF4RPHdjLaTcUMUxkTwcAYS1SsRjAwJqKCjq2QmK2WwmvjECI2JGc+3xZL+ZXrXICIiIiIiIiIiFJk0NZ22B7/jgxw+Qkok9q6gHh/8flZ304nwkAcbzqUqa3GoqiBohMd9FJWQG4NMp8HrFJb6wbFY5y0jS/jIHaAfDBwcUB1Sp7RIdsv4FoVW03j44kcGjqU13Nam6fO/RSKBaZW71/ljFa8ojB+l66m1t1JfsxrKTPeV/n125KHNrfW1smtBnoX/+M5sL2vx9bwcLtetsmt8q2v4355yEqEsZU9X9WYM6Pax50f9l6EYb+GhrNxydJbRERERERERET/+QbEaSM2tsdQ3wAAAABJRU5ErkJggg=="},
+		{".png", "test-image-2.png", "Test image 2", "iVBORw0KGgoAAAANSUhEUgAAAJYAAACWBAMAAADOL2zRAAAAG1BMVEXMzMyWlpaqqqq3t7fFxcW+vr6xsbGjo6OcnJyLKnDGAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABAElEQVRoge3SMW+DMBiE4YsxJqMJtHOTITPeOsLQnaodGImEUMZEkZhRUqn92f0MaTubtfeMh/QGHANEREREREREREREtIJJ0xbH299kp8l8FaGtLdTQ19HjofxZlJ0m1+eBKZcikd9PWtXC5DoDotRO04B9YOvFIXmXLy2jEbiqE6Df7DTleA5socLqvEFVxtJyrpZFWz/pHM2CVte0lS8g2eDe6prOyqPglhzROL+Xye4tmT4WvRcQ2/m81p+/rdguOi8Hc5L/8Qk4vhZzy08DduGt9eVQyP2qoTM1zi0/uf4hvBWf5c77e69Gf798y08L7j0RERERERERERH9P99ZpSVRivB/rgAAAABJRU5ErkJggg=="},
+		{".png", "test-image-3.png", "Test image 3", "iVBORw0KGgoAAAANSUhEUgAAASwAAAEsBAMAAACLU5NGAAAAG1BMVEXMzMyWlpacnJyqqqrFxcWxsbGjo6O3t7e+vr6He3KoAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAD90lEQVR4nO3cwW+bSBQH4AcGw5HnJDhHaN3dHO1su9ojNGnPtrUb7dFuIiVHnEo5263Uv3vfGwab1myVA5DV6vcpgeD35HmeGYbJxUQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/zOb3N5BRexlu9/Jo+NCQFl/HbWrRK7s6Amcdy3jCfaftyOT/OmsnLxSFqkzu04Ns1Z+RxPOMtUc63fH6U5HP8O5/uo1Vyh9IJhTylwSjz0pV0y4Tex0dJ7iij3ck+WiV3J9RPvVhRLgO5O5V+KOSl7MesnXSRH++jNrlDAWurEW0i6ZOz8jI9mlwaDXkftckd8nXEdgnNVjI2sf6Q+VvLSMiMHJnupHC0j9rkrmlL87Lhs7JK86oM1fowVFq0jdrkjn2QKbMuTEvD8aGsfCQ9th9PbzHeR21yt1KWkUq3et+Tq4tDHpnXfZ67+7Zdltu1itrkbrEuRWVLWdmwHbl0shlXSQ7LLVtFbXLXZUmLphHOHK3IsWVtTg6Lk6PFV1Gb3G1Z9I1Xjb015NpSHq7jfntL7reoaW7JhD+pJQ2537llVuyGO1Em17iWJMt7f3ei/zeZcdGlKLDr1saW5XPV9F9bM2pV1CZ3yDxDZFx0HZcF0z+s8rpwVcuWPo5k1KqoTe7QwD58mp6Js/PUTn4tVEatx2ei3lAzu4M4t3uErQl5PN3YOb84NR+gitrkDnl8J51QNO23hjLH7SqQxxnp0trbfotmo9t0RE27U9k9hFw2PuBfLnVD0d/u9KMs8hNq2svrxFqXJXprZtmg9riXp5v0jTRI4afyn5lv1X8+gRaQ22XA/zT6sxatkgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD65tjf/5gXLYtHb/8l8kNZkVw5zEwjIjei8ru7rtJ7/YqcO3ISorTFsiLvt+eXZY7xlp5sWd6b7KscrpeZ80DBus2y6D1dviY3C+QP/9WUnGWkp8GrhZa1fE3DQiK1ssYrurdlDeblwZ86TzTctFuWf/dxPihy+kw31+/IuTOnm2v98I6EwoTe1cuKLsLEluVm5cFLHHf7pc2JKIPoZl4STpfFHzSRfnEyc5pQrmVJiO7l13yRHpdlPQ0LW5ZTHSInWN23WZZMedMJycUq0aa1FT1F1dyK6MugoHpvuY903Fv0a9Jqb+n7apesHlY0KSvRU6233CV9V5Z/RsdzixbzlsvSuUXL4nFOT9mVtq2nw9yiYPx9WebCHGt3IrW7yOnby51IuyzPKEgv9M31dLgTKUgayioH+oqrdavlsp5hWPTb3jM9vnQBjZyLl64AAP43/gHVSaMe2vmdiAAAAABJRU5ErkJggg=="},
+		{".png", "test-image-4.png", "Test image 4", "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"},
 	}
 )
 
@@ -79,7 +77,7 @@ func Users() []*models.User {
 			if err != nil {
 				panic(err)
 			}
-			user.LastLogin = sql.NullTime{Valid: true, Time: updated}
+			user.LastLogin = models.NewNullTime(updated)
 			user.Stats.LoginCount = 1
 
 			decoder := base64.NewDecoder(
@@ -87,11 +85,10 @@ func Users() []*models.User {
 				strings.NewReader(testImages[0].data),
 			)
 			ppicID := uuid.Must(uuid.NewV4())
-			path := db.ProfilePicturePath(
-				&user.ID,
-				&ppicID,
-				testImages[0].oFilename,
-				storageDrv.Path(),
+			path := storageDrv.NormalizePath(
+				"users",
+				user.ID.String(),
+				fmt.Sprintf("%s%s", ppicID.String(), testImages[0].ext),
 			)
 			absPath, err := storageDrv.AddFile(decoder, path)
 			if err != nil {
@@ -210,6 +207,22 @@ func Items(users []*models.User) []*models.Item {
 					panic(err)
 				}
 				item.AdminApproved = true
+				item.Translations = []*models.Translation{
+					{
+						Lang:        models.English,
+						Name:        name,
+						Slug:        models.Slugify(name),
+						Description: fmt.Sprintf("Description of %s", name),
+						ItemID:      &item.ID,
+					},
+					{
+						Lang:        models.Spanish,
+						Name:        fmt.Sprintf("Artículo de prueba %.3d", (j*30)+i+1),
+						Slug:        models.Slugify(fmt.Sprintf("Artículo de prueba %.3d", (j*30)+i+1)),
+						Description: fmt.Sprintf("Descripción del Artículo de prueba of %.3d", (j*30)+i+1),
+						ItemID:      &item.ID,
+					},
+				}
 
 				for k, img := range testImages {
 					decoder := base64.NewDecoder(
@@ -217,7 +230,7 @@ func Items(users []*models.User) []*models.Item {
 						strings.NewReader(testImages[0].data),
 					)
 					imgID := uuid.Must(uuid.NewV4())
-					path := db.ItemImagePath(&item.ID, &imgID, img.oFilename, storageDrv.Root())
+					path := storageDrv.NormalizePath("items", item.ID.String(), fmt.Sprintf("%s%s", imgID.String(), img.ext))
 					absPath, err := storageDrv.AddFile(decoder, path)
 					if err != nil {
 						log.Fatalf("mock.Items: %v", err)
@@ -226,12 +239,12 @@ func Items(users []*models.User) []*models.Item {
 						File: &models.File{
 							ID:               uuid.NullUUID{Valid: true, UUID: imgID},
 							CreatedAt:        updated,
-							Path:             sql.NullString{Valid: true, String: filepath.Join(storageDrv.Path(), path)},
-							AbsPath:          sql.NullString{Valid: true, String: absPath},
-							AltText:          sql.NullString{Valid: true, String: fmt.Sprintf("Image %d of 4", k+1)},
-							OriginalFilename: sql.NullString{Valid: true, String: img.oFilename},
-							FileExt:          sql.NullString{Valid: true, String: ".png"},
-							Order:            sql.NullInt64{Valid: true, Int64: int64(k + 1)},
+							Path:             models.NewNullString(path),
+							AbsPath:          models.NewNullString(absPath),
+							AltText:          models.NewNullString(fmt.Sprintf("Image %d of 4", k+1)),
+							OriginalFilename: models.NewNullString(img.oFilename),
+							FileExt:          models.NewNullString(".png"),
+							Order:            models.NewNullInt64(k + 1),
 						},
 						ItemID: &item.ID,
 					}
@@ -287,7 +300,7 @@ func Bids(items []*models.Item, users []*models.User) []*models.Bid {
 					if err != nil {
 						panic(err)
 					}
-					bid.UpdatedAt = sql.NullTime{Valid: true, Time: updated}
+					bid.UpdatedAt = models.NewNullTime(updated)
 
 					for bid.Amount.Lt(item.StartingPrice) {
 						bid.Amount = bid.Amount.Add(models.Currency(100))

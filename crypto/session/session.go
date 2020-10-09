@@ -57,6 +57,7 @@ type Manager interface {
 	FromCookie(r *http.Request) (Session, error)
 	Context(next http.Handler) http.Handler
 	NoErrContext(next http.Handler) http.Handler
+	CookieName() string
 }
 
 type Session interface {
@@ -79,14 +80,20 @@ type Session interface {
 type sessionManager struct {
 	sync.RWMutex
 	store          Storer
-	CookieName     string
+	cookieName     string
 	maxAge         int
 	activeSessions int
 	config         config.Configurer
 }
 
 func NewManager(store Storer, cookieName string, maxAge int, config config.Configurer) (Manager, error) {
-	return &sessionManager{store: store, CookieName: cookieName, maxAge: maxAge, config: config}, nil
+	return &sessionManager{store: store, cookieName: cookieName, maxAge: maxAge, config: config}, nil
+}
+
+func (m *sessionManager) CookieName() string {
+	m.Lock()
+	defer m.Unlock()
+	return m.cookieName
 }
 
 func (m *sessionManager) New(values Values) (Session, error) {
@@ -283,7 +290,7 @@ func (m *sessionManager) NewAuthCookie(ses Session, domain string) (*http.Cookie
 	id, _, _ := ses.Metadata()
 
 	return &http.Cookie{
-		Name:     m.CookieName,
+		Name:     m.cookieName,
 		Value:    id,
 		Expires:  expiry,
 		MaxAge:   int(expiry.Sub(time.Now()).Seconds()),
@@ -329,9 +336,9 @@ func (k Key) String() string {
 // FromCookie extracts a *Session from the *http.Request using the session
 // cookie.
 func (m *sessionManager) FromCookie(r *http.Request) (Session, error) {
-	cookie, err := r.Cookie(m.CookieName)
+	cookie, err := r.Cookie(m.cookieName)
 	if err != nil {
-		return nil, fmt.Errorf("cookie %s: %w", m.CookieName, ErrNotFound)
+		return nil, fmt.Errorf("cookie %s: %w", m.cookieName, ErrNotFound)
 	}
 	ses, err := m.Get(cookie.Value)
 	if err != nil {

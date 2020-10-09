@@ -48,16 +48,23 @@ type Manager interface {
 	DropToken(digest string) error
 	NewToken(login time.Time, id *uuid.UUID, pwHash string, kind Kind, expiry *time.Time) (*Token, error)
 	CSRFContext(next http.Handler) http.Handler
-	NewCSRFCookie(domain string) (*http.Cookie, error)
+	NewCSRFCookie(userID *uuid.UUID, domain string) (*http.Cookie, error)
+	CSRFFromCookie(r *http.Request) (*Token, error)
 }
 
 type Kind int
 
 const (
+	// Registration token.
 	Registration Kind = iota + 1
+	// PasswordReset token.
 	PasswordReset
+	// CSRF token.
 	CSRF
+	// Redirect token
 	Redirect
+	// State if valid, restore stateful data to the frontend
+	State
 )
 
 var TokenKinds = []string{
@@ -65,6 +72,7 @@ var TokenKinds = []string{
 	PasswordReset: "PasswordReset",
 	CSRF:          "CSRF",
 	Redirect:      "Redirect",
+	State:         "State",
 }
 
 func (kind Kind) String() string {
@@ -265,7 +273,7 @@ func CSRFTokenFromContext(ctx context.Context) (*CSRFToken, error) {
 }
 
 // NewCSRFCookie create a new secure cookie for CSRF.
-func (m *tokenManager) NewCSRFCookie(domain string) (*http.Cookie, error) {
+func (m *tokenManager) NewCSRFCookie(userID *uuid.UUID, domain string) (*http.Cookie, error) {
 
 	if domain == "" {
 		domain = m.config.SiteHost()
@@ -274,7 +282,7 @@ func (m *tokenManager) NewCSRFCookie(domain string) (*http.Cookie, error) {
 	expiry := time.Now().Add(m.config.CSRFTokenExpiry())
 	t, err := m.NewToken(
 		time.Now(),
-		&uuid.Nil,
+		userID,
 		crypto.RandomString(64),
 		CSRF,
 		&expiry,
@@ -291,7 +299,7 @@ func (m *tokenManager) NewCSRFCookie(domain string) (*http.Cookie, error) {
 		Secure:   true,
 		HttpOnly: true,
 		Domain:   domain,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteDefaultMode,
 		Path:     "/",
 	}, nil
 }
@@ -313,6 +321,18 @@ func (m *tokenManager) CSRFContext(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), CSRFCtxKey, &CSRFToken{t})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (m *tokenManager) CSRFFromCookie(r *http.Request) (*Token, error) {
+	cookie, err := r.Cookie(m.config.CSRFCookieName())
+	if err != nil {
+		return nil, err
+	}
+	t, err := m.CheckToken(cookie.Value, CSRF)
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
 }
 
 var (

@@ -13,6 +13,7 @@ import (
 	pkg "github.com/djangulo/sfd/accounts"
 	pkgTest "github.com/djangulo/sfd/accounts/tests"
 	"github.com/djangulo/sfd/config"
+	"github.com/djangulo/sfd/crypto/session"
 	"github.com/djangulo/sfd/crypto/token"
 	"github.com/djangulo/sfd/db"
 	"github.com/djangulo/sfd/db/mock"
@@ -110,7 +111,12 @@ func TestPostgres(t *testing.T) {
 		panic(err)
 	}
 
-	server, err := pkg.NewServer(store, mailDriver, cnf, storageDrv, tm)
+	sm, err := session.NewManager(store, "sfd-test-session", 60, cnf)
+	if err != nil {
+		panic(err)
+	}
+
+	server, err := pkg.NewServer(store, mailDriver, cnf, storageDrv, tm, sm)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,7 +3,6 @@ package token
 import (
 	"crypto/sha256"
 	"crypto/sha512"
-	"database/sql"
 	"hash"
 	"testing"
 	"time"
@@ -16,7 +15,7 @@ import (
 
 func TestManager(t *testing.T) {
 	user := models.User{
-		LastLogin:    sql.NullTime{Valid: true, Time: time.Now()},
+		LastLogin:    models.NewNullTime(time.Now()),
 		PasswordHash: "abcd1234",
 		DBObj: &models.DBObj{
 			ID: uuid.Must(uuid.NewV4()),
@@ -63,7 +62,7 @@ func TestManager(t *testing.T) {
 	t.Run("failure", func(t *testing.T) {
 		user2 := models.User{
 			DBObj:        &models.DBObj{ID: uuid.UUID{}},
-			LastLogin:    sql.NullTime{Valid: true, Time: time.Now()},
+			LastLogin:    models.NewNullTime(time.Now()),
 			PasswordHash: "4321dcba",
 		}
 		tg, _ := NewManager(store, sha256.New, conf)

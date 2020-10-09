@@ -256,8 +256,11 @@ func (ir *ItemRequest) Bind(r *http.Request) error {
 func (s *Server) CreateItem(w http.ResponseWriter, r *http.Request) {
 	data := &ItemRequest{}
 	if err := render.Bind(r, data); err != nil {
-		e := err.(*validators.Errors)
-		render.Render(w, r, e)
+		if e, ok := err.(*validators.Errors); ok {
+			render.Render(w, r, e)
+			return
+		}
+		render.Render(w, r, sfdErrors.ErrInvalidRequest(err))
 		return
 	}
 
@@ -367,7 +370,7 @@ func (s *Server) AddItemImages(w http.ResponseWriter, r *http.Request) {
 			render.Render(w, r, ErrInternalServerError(err))
 			return
 		}
-		image.Path.String = db.ItemImagePath(&item.ID, &image.ID.UUID, ext, s.fs.Root())
+		image.Path.String = s.fs.NormalizePath("items", item.ID.String(), fmt.Sprintf("%s%s", image.ID.UUID.String(), ext))
 		image.Path.Valid = true
 		image.AbsPath.String, err = s.fs.AddFile(file, image.Path.String)
 		if err != nil {
@@ -432,7 +435,6 @@ func ItemBids(w http.ResponseWriter, r *http.Request) {
 	bids := r.Context().Value(ItemBidsCtxKey).([]*models.Bid)
 
 	if err := render.RenderList(w, r, NewBidListResponse(bids)); err != nil {
-		fmt.Println(err)
 		render.Render(w, r, ErrRender(err))
 		return
 	}

@@ -34,7 +34,6 @@ resources:
       repository: ((dockerhub/username.username))/cypress-go
       username: ((dockerhub/username.username))
       password: ((dockerhub/password.password))
-      email: ((dockerhub/email.email))
 
   - name: dind-go-image
     type: docker-image
@@ -43,7 +42,6 @@ resources:
       repository: ((dockerhub/username.username))/dind-go
       username: ((dockerhub/username.username))
       password: ((dockerhub/password.password))
-      email: ((dockerhub/email.email))
 
   - name: terraform
     icon: terraform
@@ -66,6 +64,9 @@ task-config: &task-config
     - name: sfd-git
   params:
     GO111MODULE: "on"
+  image_resource:
+    type: docker-image
+    source: { "repository": "((dockerhub/username.username))/dind-go" }
 
 e2e-config: &e2e-config
   platform: linux
@@ -83,7 +84,6 @@ jobs:
         passed: [publish-dind-go]
       - get: dind-go-image
       - task: run-tests
-        image: dind-go-image
         config:
           <<: *task-config
           run:

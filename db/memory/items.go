@@ -2,12 +2,13 @@ package memory
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gofrs/uuid"
 
+	"github.com/djangulo/sfd/db/filters"
 	"github.com/djangulo/sfd/db/models"
 	"github.com/djangulo/sfd/pagination"
 )
@@ -41,13 +42,20 @@ func (m *Memory) GetBid(ctx context.Context, id *uuid.UUID) (*models.Bid, error)
 
 func (m *Memory) ListItems(ctx context.Context) ([]*models.Item, error) {
 	var (
-		limit       int        = 10
-		lastID      *uuid.UUID = &uuid.Nil
-		lastCreated *time.Time = &time.Time{}
+		limit         int           = 10
+		lastID        *uuid.UUID    = &uuid.Nil
+		lastCreated   *time.Time    = &time.Time{}
+		adminApproved filters.State = filters.True
+		closed        filters.State = filters.Off
+		blind         filters.State = filters.Off
 	)
 	opts, ok := ctx.Value(pagination.CtxKey).(pagination.Options)
 	if ok {
 		limit, lastID, lastCreated = opts.Limit(), opts.LastID(), opts.LastCreated()
+	}
+	fopts, ok := ctx.Value(filters.CtxKey).(filters.Options)
+	if ok {
+		adminApproved, closed, blind = fopts.AdminApproved(), fopts.Closed(), fopts.Blind()
 	}
 
 	models.ItemsOrderedBy(
@@ -55,10 +63,114 @@ func (m *Memory) ListItems(ctx context.Context) ([]*models.Item, error) {
 		models.SortItemsByIDDesc,
 	).Sort(m.items)
 
+	var goes bool
 	var items = make([]*models.Item, 0)
 	for _, item := range m.items {
-		if item.AdminApproved {
+		goes = false
+		if !(adminApproved.On() || closed.On() || blind.On()) {
+			goes = true
+		}
+		if adminApproved.On() {
+			if adminApproved.True() && item.AdminApproved {
+				goes = true
+			} else if adminApproved.False() && !item.AdminApproved {
+				goes = true
+			}
+		}
+		if closed.On() {
+			if closed.True() && item.Closed {
+				goes = true
+			} else if closed.False() && !item.Closed {
+				goes = true
+			}
+		}
+		if blind.On() {
+			if blind.True() && item.Blind {
+				goes = true
+			} else if blind.False() && !item.Blind {
+				goes = true
+			}
+		}
+		if goes {
 			items = append(items, item)
+		}
+	}
+
+	if lastID != nil && *lastID != uuid.Nil && !lastCreated.IsZero() {
+
+		for i, item := range items {
+			created := item.CreatedAt
+			if item.ID == *lastID && created.Equal(*lastCreated) {
+				if itemsLeft := len(items[(i + 1):]); limit > itemsLeft {
+					limit = itemsLeft
+				}
+				return items[(i + 1):(i + 1 + limit)], nil
+			}
+		}
+	} else {
+		if limit > len(items) {
+			limit = len(items)
+		}
+		return items[:limit], nil
+	}
+	return nil, models.ErrNoResults
+}
+
+func (m *Memory) SearchItems(ctx context.Context, query string) ([]*models.Item, error) {
+	var (
+		limit         int           = 10
+		lastID        *uuid.UUID    = &uuid.Nil
+		lastCreated   *time.Time    = &time.Time{}
+		adminApproved filters.State = filters.True
+		closed        filters.State = filters.Off
+		blind         filters.State = filters.Off
+	)
+	opts, ok := ctx.Value(pagination.CtxKey).(pagination.Options)
+	if ok {
+		limit, lastID, lastCreated = opts.Limit(), opts.LastID(), opts.LastCreated()
+	}
+	fopts, ok := ctx.Value(filters.CtxKey).(filters.Options)
+	if ok {
+		adminApproved, closed, blind = fopts.AdminApproved(), fopts.Closed(), fopts.Blind()
+	}
+
+	models.ItemsOrderedBy(
+		models.SortItemsByCreatedAtDesc,
+		models.SortItemsByIDDesc,
+	).Sort(m.items)
+
+	var goes bool
+	var items = make([]*models.Item, 0)
+	for _, item := range m.items {
+		goes = false
+		if !(adminApproved.On() || closed.On() || blind.On()) {
+			goes = true
+		}
+		if adminApproved.On() {
+			if adminApproved.True() && item.AdminApproved {
+				goes = true
+			} else if adminApproved.False() && !item.AdminApproved {
+				goes = true
+			}
+		}
+		if closed.On() {
+			if closed.True() && item.Closed {
+				goes = true
+			} else if closed.False() && !item.Closed {
+				goes = true
+			}
+		}
+		if blind.On() {
+			if blind.True() && item.Blind {
+				goes = true
+			} else if blind.False() && !item.Blind {
+				goes = true
+			}
+		}
+		if goes {
+			if strings.Contains(strings.ToLower(item.Name+" "+item.Description), strings.ToLower(query)) {
+				items = append(items, item)
+			}
 		}
 	}
 
@@ -94,7 +206,7 @@ func (m *Memory) GetBySlug(slug string) (*models.Item, error) {
 func (m *Memory) PublishItem(itemID *uuid.UUID, datetime time.Time) error {
 	for _, item := range m.items {
 		if item.ID == *&item.ID {
-			item.PublishedAt = sql.NullTime{Valid: true, Time: datetime}
+			item.PublishedAt = models.NewNullTime(datetime)
 		}
 	}
 	return nil
@@ -143,6 +255,16 @@ func (m *Memory) ItemBids(ctx context.Context, itemID *uuid.UUID) ([]*models.Bid
 	for _, bid := range m.bids {
 		if *bid.ItemID == *itemID {
 			bids = append(bids, bid)
+		}
+	}
+	for _, b := range bids {
+		for _, u := range m.users {
+			if *b.UserID == u.ID {
+				b.User = &models.User{
+					Username: u.Username,
+					DBObj:    &models.DBObj{ID: u.ID},
+				}
+			}
 		}
 	}
 

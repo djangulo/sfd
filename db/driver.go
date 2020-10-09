@@ -23,6 +23,8 @@ type ItemStorer interface {
 	GetBySlug(slug string) (*models.Item, error)
 	// ListItems returns a list of items.
 	ListItems(ctx context.Context) ([]*models.Item, error)
+	// SearchItems returns a list of items filtered by query in Name, Description.
+	SearchItems(ctx context.Context, query string) ([]*models.Item, error)
 	// ItemBids gets a list of bids for an item.
 	ItemBids(ctx context.Context, itemID *uuid.UUID) ([]*models.Bid, error)
 	WatchItem(itemID, userID *uuid.UUID) error

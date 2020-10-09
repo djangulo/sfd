@@ -28,20 +28,27 @@ FROM
     LEFT JOIN sfd.user_stats AS stats ON users.id = stats.user_id
     LEFT JOIN sfd.profile_pictures AS pictures ON users.id = pictures.user_id
     LEFT JOIN sfd.user_preferences AS preferences ON users.id = preferences.user_id;
+
 CREATE VIEW sfd.items_owner AS
 SELECT
-    items.*,
+    items.id,
+    items.owner_id,
+    items.name,
+    items.slug,
+    items.description,
+    items.starting_price,
+    items.min_increment,
+    items.max_price,
+    items.published_at,
+    items.bid_interval,
+    items.bid_deadline,
+    items.admin_approved,
+    items.closed,
+    items.blind,
+    items.user_notified,
+    items.created_at,
     users.id AS "owner.id",
     users.username AS "owner.username",
-    users.email AS "owner.email",
-    users.full_name AS "owner.full_name",
-    users.created_at AS "owner.created_at",
-    users.updated_at AS "owner.updated_at",
-    users.deleted_at AS
-    "owner.deleted_at",
-    stats.login_count AS "owner.stats.login_count",
-    stats.items_created AS "owner.stats.items_created",
-    stats.bids_created AS "owner.stats.bids_created",
     item_images.id AS "cover_image.id",
     item_images.path AS "cover_image.path",
     item_images.abs_path AS "cover_image.abs_path",
@@ -69,6 +76,7 @@ FROM
             sfd.item_images
         WHERE
             "order" = 1) AS item_images ON item_images.item_id = items.id;
+
 CREATE VIEW sfd.bids_full AS
 SELECT
     bids.*,
@@ -84,22 +92,9 @@ SELECT
     items.bid_deadline AS "item.bid_deadline",
     items.blind AS "item.blind",
     items.closed AS "item.closed",
-    items.created_at AS "item.created_at",
-    items.updated_at AS "item.updated_at",
-    items.deleted_at AS
-    "item.deleted_at",
     items.published_at AS "item.published_at",
     items.admin_approved AS "item.admin_approved",
     "owner.username" AS "item.owner.username",
-    "owner.email" AS "item.owner.email",
-    "owner.full_name" AS "item.owner.full_name",
-    "owner.created_at" AS "item.owner.created_at",
-    "owner.updated_at" AS "item.owner.updated_at",
-    "owner.deleted_at" AS
-    "item.owner.deleted_at",
-    "owner.stats.login_count" AS "item.owner.stats.login_count",
-    "owner.stats.items_created" AS "item.owner.stats.items_created",
-    "owner.stats.bids_created" AS "item.owner.stats.bids_created",
     "cover_image.id" AS "item.cover_image.id",
     "cover_image.path" AS "item.cover_image.path",
     "cover_image.abs_path" AS "item.cover_image.abs_path",
@@ -108,16 +103,7 @@ SELECT
     "cover_image.file_ext" AS "item.cover_image.file_ext",
     "cover_image.order" AS "item.cover_image.order",
     users.id AS "user.id",
-    users.username AS "user.username",
-    users.email AS "user.email",
-    users.full_name AS "user.full_name",
-    users.created_at AS "user.created_at",
-    users.updated_at AS "user.updated_at",
-    users.deleted_at AS
-    "user.deleted_at",
-    stats.login_count AS "user.stats.login_count",
-    stats.items_created AS "user.stats.items_created",
-    stats.bids_created AS "user.stats.bids_created"
+    users.username AS "user.username"
 FROM
     sfd.item_bids AS bids
     LEFT JOIN sfd.items_owner AS items ON bids.item_id = items.id

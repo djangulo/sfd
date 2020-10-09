@@ -30,6 +30,5 @@ db/mock/migrations/
 semantic/
 
 # item data generated on tests or otherwise
-assets/
-
+**/assets.go
 .nvmrc

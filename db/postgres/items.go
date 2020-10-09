@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gofrs/uuid"
 	"github.com/jmoiron/sqlx"
 
+	"github.com/djangulo/sfd/db/filters"
 	"github.com/djangulo/sfd/db/models"
 	"github.com/djangulo/sfd/pagination"
 )
@@ -34,7 +36,15 @@ func (pg *Postgres) GetItem(ctx context.Context, id *uuid.UUID) (*models.Item, e
 		}
 		item.Images = append(item.Images, img)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	item.WinningBid, err = pg.ItemWinningBid(&item.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	item.Translations, err = pg.ItemTranslations(&item.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -51,29 +61,63 @@ func (pg *Postgres) GetBid(ctx context.Context, id *uuid.UUID) (*models.Bid, err
 	return bid, nil
 }
 
+func whereAnd(stmt string) string {
+	if strings.Contains(strings.ToLower(stmt), "where") {
+		stmt += " AND"
+	} else {
+		stmt += " WHERE"
+	}
+	return stmt
+}
+
 func (pg *Postgres) ListItems(ctx context.Context) ([]*models.Item, error) {
 	var (
-		limit       int        = 10
-		lastID      *uuid.UUID = &uuid.Nil
-		lastCreated *time.Time = &time.Time{}
-		rows        *sqlx.Rows
-		err         error
+		limit         int           = 10
+		lastID        *uuid.UUID    = &uuid.Nil
+		lastCreated   *time.Time    = &time.Time{}
+		adminApproved filters.State = filters.True
+		closed        filters.State = filters.Off
+		blind         filters.State = filters.Off
 	)
+
 	opts, ok := ctx.Value(pagination.CtxKey).(pagination.Options)
 	if ok {
 		limit, lastID, lastCreated = opts.Limit(), opts.LastID(), opts.LastCreated()
 	}
+	fopts, ok := ctx.Value(filters.CtxKey).(filters.Options)
+	if ok {
+		adminApproved, closed, blind = fopts.AdminApproved(), fopts.Closed(), fopts.Blind()
+	}
 
 	stmt := `SELECT * FROM sfd.items_owner`
-	if *lastID != uuid.Nil && !lastCreated.IsZero() {
-		stmt += ` WHERE (created_at, id) < ($1, $2)
-		AND admin_approved = TRUE
-		ORDER BY created_at DESC, id DESC LIMIT $3`
-		rows, err = pg.db.Queryx(stmt, lastCreated, lastID, limit)
-	} else {
-		stmt += " WHERE admin_approved = TRUE ORDER BY created_at DESC, id DESC LIMIT $1;"
-		rows, err = pg.db.Queryx(stmt, limit)
+	if adminApproved != filters.Off {
+		stmt = whereAnd(stmt)
+		stmt += fmt.Sprintf(` admin_approved = %s`, adminApproved)
 	}
+	if closed != filters.Off {
+		stmt = whereAnd(stmt)
+		stmt += fmt.Sprintf(` closed = %s`, closed)
+	}
+	if blind != filters.Off {
+		stmt = whereAnd(stmt)
+		stmt += fmt.Sprintf(` blind = %s`, blind)
+	}
+
+	// this block sets the argument, notice LIMIT is $1,
+	// if lastCReated and lastID exist, they're appended as $2 $3
+	var args = make([]interface{}, 0)
+	{
+		if *lastID != uuid.Nil && !lastCreated.IsZero() {
+			stmt = whereAnd(stmt)
+			stmt += ` (created_at, id) < ($2, $3)`
+			args = append(args, []interface{}{limit, lastCreated, lastID}...)
+		} else {
+			args = append(args, limit)
+		}
+		stmt += "  ORDER BY created_at DESC, id DESC LIMIT $1;"
+	}
+
+	rows, err := pg.db.Queryx(stmt, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
@@ -89,6 +133,157 @@ func (pg *Postgres) ListItems(ctx context.Context) ([]*models.Item, error) {
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
+	}
+
+	var ids = make([]*uuid.UUID, 0)
+	for _, item := range objs {
+		item.Translations = make([]*models.Translation, 0)
+		ids = append(ids, &item.ID)
+	}
+
+	translations, err := pg.ItemTranslations(ids...)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range objs {
+		for _, t := range translations {
+			if *t.ItemID == item.ID {
+				item.Translations = append(item.Translations, t)
+			}
+		}
+	}
+
+	return objs, nil
+}
+
+func (pg *Postgres) SearchItems(ctx context.Context, query string) ([]*models.Item, error) {
+
+	var (
+		limit         int           = 10
+		lastRank      float64       = 0.0
+		adminApproved filters.State = filters.True
+		closed        filters.State = filters.Off
+		blind         filters.State = filters.Off
+	)
+	opts, ok := ctx.Value(pagination.CtxKey).(pagination.Options)
+	if ok {
+		limit, lastRank = opts.Limit(), opts.LastAmount()
+	}
+	fopts, ok := ctx.Value(filters.CtxKey).(filters.Options)
+	if ok {
+		adminApproved, closed, blind = fopts.AdminApproved(), fopts.Closed(), fopts.Blind()
+	}
+
+	stmt := `
+SELECT 
+	id,
+    owner_id,
+    name,
+    slug,
+    description,
+    starting_price,
+    min_increment,
+    max_price,
+    published_at,
+    bid_interval,
+    bid_deadline,
+    admin_approved,
+    closed,
+    blind,
+    user_notified,
+    created_at,
+    "owner.id",
+    "owner.username",
+    "cover_image.id",
+    "cover_image.path",
+    "cover_image.abs_path",
+    "cover_image.original_filename",
+    "cover_image.alt_text",
+    "cover_image.file_ext",
+    "cover_image.order",
+	ranking.rank AS rank from sfd.items_owner
+INNER JOIN (
+SELECT
+	item_id,
+	ts_rank_cd(textsearchable_index_col_en, websearch_to_tsquery('english', $2)) AS rank
+FROM sfd.item_translations
+WHERE
+	lang = 'english'
+	AND
+	textsearchable_index_col_en @@ websearch_to_tsquery('english', $2)
+UNION
+SELECT
+	item_id,
+	ts_rank_cd(textsearchable_index_col_es, websearch_to_tsquery('spanish', $2)) AS rank
+FROM sfd.item_translations
+WHERE
+	lang = 'spanish'
+	AND textsearchable_index_col_es @@ websearch_to_tsquery('spanish', $2)
+ORDER BY rank DESC) AS ranking ON ranking.item_id = id`
+	if adminApproved != filters.Off {
+		stmt = whereAnd(stmt)
+		stmt += fmt.Sprintf(` admin_approved = %s`, adminApproved)
+	}
+	if closed != filters.Off {
+		stmt = whereAnd(stmt)
+		stmt += fmt.Sprintf(` closed = %s`, closed)
+	}
+	if blind != filters.Off {
+		stmt = whereAnd(stmt)
+		stmt += fmt.Sprintf(` blind = %s`, blind)
+	}
+
+	// this block sets the argument, notice LIMIT is $1,
+	// if lastCReated and lastID exist, they're appended as $2 $3
+	var args = make([]interface{}, 0)
+	{
+		if lastRank > 0.0 {
+			stmt = whereAnd(stmt)
+			stmt += ` rank < ($3)`
+			args = append(args, []interface{}{limit, query, lastRank}...)
+		} else {
+			args = append(args, []interface{}{limit, query}...)
+		}
+	}
+	stmt += " ORDER BY rank DESC LIMIT $1;"
+
+	rows, err := pg.db.Queryx(stmt, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+
+	var objs = make([]*models.Item, 0)
+	for rows.Next() {
+		var obj = new(models.Item)
+		err = rows.StructScan(obj)
+		if err != nil {
+			return nil, err
+		}
+		objs = append(objs, obj)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, fmt.Errorf("no results")
+	}
+
+	var ids = make([]*uuid.UUID, 0)
+	for _, item := range objs {
+		item.Translations = make([]*models.Translation, 0)
+		ids = append(ids, &item.ID)
+	}
+
+	translations, err := pg.ItemTranslations(ids...)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range objs {
+		for _, t := range translations {
+			if *t.ItemID == item.ID {
+				item.Translations = append(item.Translations, t)
+			}
+		}
 	}
 
 	return objs, nil
@@ -383,6 +578,33 @@ func (pg *Postgres) ItemImages(ctx context.Context, itemID *uuid.UUID) ([]*model
 	var objs = make([]*models.ItemImage, 0)
 	for rows.Next() {
 		var obj = new(models.ItemImage)
+		err = rows.StructScan(obj)
+		if err != nil {
+			return nil, err
+		}
+		objs = append(objs, obj)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+
+	return objs, nil
+}
+
+func (pg *Postgres) ItemTranslations(itemID ...*uuid.UUID) ([]*models.Translation, error) {
+	valueStrings := BuildValueStrings(1, len(itemID))
+	args := make([]interface{}, 0)
+	for _, id := range itemID {
+		args = append(args, id)
+	}
+	stmt := fmt.Sprintf(`
+SELECT lang, name, slug, description, item_id FROM sfd.item_translations
+WHERE item_id IN %s;`, valueStrings)
+	rows, err := pg.db.Queryx(stmt, args...)
+
+	var objs = make([]*models.Translation, 0)
+	for rows.Next() {
+		var obj = new(models.Translation)
 		err = rows.StructScan(obj)
 		if err != nil {
 			return nil, err

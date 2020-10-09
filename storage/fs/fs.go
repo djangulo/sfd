@@ -3,9 +3,11 @@ package fs
 import (
 	"fmt"
 	"io"
+	"net/http"
 	nurl "net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/djangulo/sfd/storage"
 )
@@ -41,7 +43,7 @@ func (fs *Filesystem) Accepts(ext string) bool {
 }
 
 func (fs *Filesystem) NormalizePath(entries ...string) string {
-	entries = append([]string{fs.root}, entries...)
+	entries = append([]string{fs.path}, entries...)
 	return filepath.Join(entries...)
 }
 
@@ -93,8 +95,9 @@ func (fs *Filesystem) Close() error {
 }
 
 func (fs *Filesystem) AddFile(r io.Reader, path string) (string, error) {
-	path = fs.appendRoot(path) // append root to path
-	dir := filepath.Dir(path)
+	path = strings.TrimPrefix(path, fs.path)
+	absPath := filepath.Join(fs.root, path)
+	dir := filepath.Dir(absPath)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		err := os.MkdirAll(dir, 0777)
 		if err != nil {
@@ -102,15 +105,15 @@ func (fs *Filesystem) AddFile(r io.Reader, path string) (string, error) {
 		}
 	}
 
-	if _, err := os.Stat(path); os.IsExist(err) {
+	if _, err := os.Stat(absPath); os.IsExist(err) {
 		return "", fmt.Errorf("%w at %s", storage.ErrAlreadyExists, path)
 	}
 
-	if ext := filepath.Ext(path); !fs.acceptsExt(ext) {
+	if ext := filepath.Ext(absPath); !fs.acceptsExt(ext) {
 		return "", fmt.Errorf("%w %s", storage.ErrInvalidExtension, ext)
 	}
 
-	file, err := os.Create(path)
+	file, err := os.Create(absPath)
 	if err != nil {
 		return "", err
 	}
@@ -121,13 +124,16 @@ func (fs *Filesystem) AddFile(r io.Reader, path string) (string, error) {
 		return "", err
 	}
 
-	return path, nil
+	return absPath, nil
 }
 
 func (fs *Filesystem) RemoveFile(path string) error {
-	path = fs.appendRoot(path)
-	if err := os.Remove(path); err != nil {
+	if err := os.Remove(filepath.Join(fs.root, path)); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (fs *Filesystem) Dir() http.FileSystem {
+	return http.Dir(fs.root)
 }

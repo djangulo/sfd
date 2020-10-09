@@ -203,8 +203,6 @@ func TestContext(t *testing.T) {
 		}
 		testutils.AssertJSON(t, res)
 
-		// bb, _ := ioutil.ReadAll(res.Body)
-		// fmt.Println(string(bb))
 		testutils.DecodeJSON(t, res, want)
 		if want.Response != "OK" {
 			t.Errorf("expected %q got %q", "OK", want.Response)
@@ -288,8 +286,6 @@ func TestNoErrContext(t *testing.T) {
 		}
 		testutils.AssertJSON(t, res)
 
-		// bb, _ := ioutil.ReadAll(res.Body)
-		// fmt.Println(string(bb))
 		testutils.DecodeJSON(t, res, want)
 		if want.Response != "OK" {
 			t.Errorf("expected %q got %q", "OK", want.Response)

@@ -162,7 +162,7 @@ func AssertImagesEqual(t *testing.T, got, want *models.ItemImage) {
 	t.Helper()
 	var b strings.Builder
 
-	if *got.ItemID != *want.ItemID || got.Order != want.Order {
+	if *got.ItemID != *want.ItemID || got.Order.Int64 != want.Order.Int64 {
 		const format = "%v\t%v\t%v\n"
 		tw := new(tabwriter.Writer).Init(&b, 0, 8, 2, ' ', 0)
 		fmt.Fprintf(tw, format, "Field", "Got", "Want")

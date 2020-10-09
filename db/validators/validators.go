@@ -66,6 +66,8 @@ type Errors struct {
 }
 
 func (e *Errors) Render(w http.ResponseWriter, r *http.Request) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
 	return nil
 }
 
@@ -104,6 +106,9 @@ func (f *Errors) Has(key string) bool {
 
 // Error implements the error interface.
 func (e *Errors) Error() string {
+	if e == nil {
+		return "<nil>"
+	}
 	var errs = make([]string, 0)
 	for k, v := range e.Values {
 		errs = append(errs, fmt.Sprintf("%s:%v", k, v))
